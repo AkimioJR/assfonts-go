@@ -2,7 +2,7 @@ package ass
 
 import "errors"
 
-type None struct{}
+type CodepointSet map[rune]struct{}
 
 // RenameInfo 表示字体重命名信息
 type RenameInfo struct {

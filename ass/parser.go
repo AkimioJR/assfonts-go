@@ -10,21 +10,21 @@ import (
 )
 
 type ASSParser struct {
-	Texts             []TextInfo                 // 元素内容（不包含关于Font）
-	Styles            []StyleInfo                // 包含哪些样式
-	Dialogues         []DialogueInfo             // ASS 字幕 Dialogues 内容
-	RenameInfos       []RenameInfo               // 记录字体调用位置
-	FontSets          map[FontDesc]map[rune]None // 字体集
-	HasFonts          bool                       // 是否包含字体样式
-	HasDefaultStyle   bool                       // 是否有默认样式
-	StyleNameFontDesc map[string]*FontDesc       // 样式描述
+	Texts             []TextInfo                // 元素内容（不包含关于Font）
+	Styles            []StyleInfo               // 包含哪些样式
+	Dialogues         []DialogueInfo            // ASS 字幕 Dialogues 内容
+	RenameInfos       []RenameInfo              // 记录字体调用位置
+	FontSets          map[FontDesc]CodepointSet // 字体集
+	HasFonts          bool                      // 是否包含字体样式
+	HasDefaultStyle   bool                      // 是否有默认样式
+	StyleNameFontDesc map[string]*FontDesc      // 样式描述
 }
 
 func NewASSParser(reader io.Reader) (*ASSParser, error) {
 	ap := &ASSParser{
 		Texts:             make([]TextInfo, 200),
 		RenameInfos:       make([]RenameInfo, 0, 10),
-		FontSets:          make(map[FontDesc]map[rune]None),
+		FontSets:          make(map[FontDesc]CodepointSet),
 		HasFonts:          false,
 		HasDefaultStyle:   false,
 		StyleNameFontDesc: make(map[string]*FontDesc),
@@ -266,7 +266,7 @@ func (ap *ASSParser) setFontSets() error {
 
 		// 初始化字体集合
 		if _, ok := ap.FontSets[*fd]; !ok {
-			ap.FontSets[*fd] = make(map[rune]None)
+			ap.FontSets[*fd] = make(CodepointSet)
 		}
 
 		// 解析第11个字段（即对话文本内容）
@@ -334,9 +334,9 @@ func (ap *ASSParser) gatherCharacter(runes []rune, idx int, localFD *FontDesc, l
 
 			if localFD.FontName != "" {
 				if _, ok := ap.FontSets[*localFD]; !ok {
-					ap.FontSets[*localFD] = make(map[rune]None)
+					ap.FontSets[*localFD] = make(CodepointSet)
 				}
-				ap.FontSets[*localFD][runes[idx]] = None{}
+				ap.FontSets[*localFD][runes[idx]] = struct{}{}
 			}
 			return idx + 1
 		} else { // 处理样式覆盖
@@ -348,7 +348,7 @@ func (ap *ASSParser) gatherCharacter(runes []rune, idx int, localFD *FontDesc, l
 	// 普通字符
 	if localFD.FontName != "" {
 		if _, ok := ap.FontSets[*localFD]; !ok {
-			ap.FontSets[*localFD] = make(map[rune]None)
+			ap.FontSets[*localFD] = make(CodepointSet)
 		}
 		ap.FontSets[*localFD][runes[idx]] = struct{}{}
 	}
