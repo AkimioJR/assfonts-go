@@ -165,14 +165,8 @@ func (lib *FreeTypeLibrary) parseFace(face C.FT_Face) (*FontInfo, error) {
 		Families:  families,
 		Fullnames: fullnames,
 		PSNames:   psnames,
-		Weight:    getAssFaceWeight(face),                              // 字重
-		Slant:     110 * uint(face.style_flags&C.FT_STYLE_FLAG_ITALIC), // 0或110，斜体角度
-	}
-	if fontInfo.Slant < 0 || fontInfo.Slant > 110 {
-		fontInfo.Slant = 0 // 如果斜体角度不在0-110范围内，设置为默认值0
-	}
-	if fontInfo.Weight < 100 || fontInfo.Weight > 900 {
-		fontInfo.Weight = 400 // 如果字重不在100-900范围内，设置为默认值400
+		Weight:    getAssFaceWeight(face), // 字重
+		Slant:     getAssFaceSlant(face),  // 0或110，斜体角度
 	}
 	return &fontInfo, nil
 }
@@ -310,6 +304,17 @@ func getAssFaceWeight(face C.FT_Face) uint {
 	case 9:
 		return 900
 	default:
+		if os2Weight < 100 || os2Weight > 900 {
+			os2Weight = 400 // 如果字重不在100-900范围内，设置为默认值400
+		}
 		return uint(os2Weight)
 	}
+}
+
+func getAssFaceSlant(face C.FT_Face) uint {
+	slant := 110 * int(face.style_flags&C.FT_STYLE_FLAG_ITALIC)
+	if slant < 0 || slant > 110 {
+		slant = 0 // 如果斜体角度不在0-110范围内，设置为默认值0
+	}
+	return uint(slant)
 }
