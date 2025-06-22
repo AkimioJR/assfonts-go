@@ -83,8 +83,8 @@ func contains[T comparable](list []T, s T) bool {
 var fontPattern = regexp.MustCompile(`(?i).+\.(ttf|otf|ttc|otc)$`)
 
 // 查找字体文件
-func findFontFiles(fontsDirs []string, withDefault bool) ([]string, error) {
-	if withDefault {
+func findFontFiles(fontsDirs []string, withSystemFontPath bool) ([]string, error) {
+	if withSystemFontPath {
 		fontsDirs = append(fontsDirs, getDefaultFontPaths()...)
 	}
 	fontsPath := make([]string, 0, 10)

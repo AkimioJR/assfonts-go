@@ -16,8 +16,8 @@ func NewFontDataBase() *FontDataBase {
 	}
 }
 
-func (fp *FontDataBase) BuildDB(lib *FreeTypeLibrary, fontsDirs []string, withDefault bool, ignoreError bool) error {
-	fontPaths, err := findFontFiles(fontsDirs, withDefault)
+func (fp *FontDataBase) BuildDB(lib *FreeTypeLibrary, fontsDirs []string, withSystemFontPath bool, ignoreError bool) error {
+	fontPaths, err := findFontFiles(fontsDirs, withSystemFontPath)
 	if err != nil {
 		return fmt.Errorf("failed to find font files: %w", err)
 	}
