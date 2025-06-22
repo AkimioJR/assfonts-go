@@ -7,35 +7,62 @@ import (
 )
 
 type FontDataBase struct {
+	lib          *FreeTypeLibrary      // FreeType 库实例
+	internalLib  bool                  // 是否内部创建 FreeType 库实例
 	FontListInDB map[string][]FontInfo // path -> []FontInfo
 }
 
-func NewFontDataBase() *FontDataBase {
-	return &FontDataBase{
+// 创建一个新的 FontDataBase 对象
+// 如果传入 FreeTypeLibrary 为 nil，则会创建一个内部的 FreeTypeLibrary 实例
+// 如果传入的 FreeTypeLibrary 不为 nil，则使用该实例
+// 注意：如果传入的 FreeTypeLibrary 是内部创建的，需要调用 Close() 方法
+func NewFontDataBase(lib *FreeTypeLibrary) (*FontDataBase, error) {
+	var db = FontDataBase{
+		lib:          lib,
+		internalLib:  false,
 		FontListInDB: make(map[string][]FontInfo),
 	}
+	if lib == nil {
+		lib, err := NewFreeTypeLibrary()
+		if err != nil {
+			return nil, fmt.Errorf("create FontDataBase faild due to create internal FreeTypeLibrary: %w", err)
+		}
+		db.lib = lib
+		db.internalLib = true
+	}
+	return &db, nil
 }
 
-func (fp *FontDataBase) BuildDB(lib *FreeTypeLibrary, fontsDirs []string, withSystemFontPath bool, ignoreError bool) error {
+// 关闭 FontDataBase
+// 如果 FontDataBase 是内部创建的 FreeTypeLibrary 实例，则会关闭该实例
+// 如果传入的 FreeTypeLibrary 是外部创建的，则不会关闭该实例
+func (fdb *FontDataBase) Close() error {
+	if fdb.internalLib && fdb.lib != nil {
+		err := fdb.lib.Close()
+		fdb.lib = nil
+		if err != nil {
+			return fmt.Errorf("failed to close FontDataBase due to FreeType library close error: %v", err)
+		}
+		return nil
+	}
+	return nil
+}
+
+func (fdb *FontDataBase) BuildDB(fontsDirs []string, withSystemFontPath bool, ignoreError bool) error {
 	fontPaths, err := findFontFiles(fontsDirs, withSystemFontPath)
 	if err != nil {
 		return fmt.Errorf("failed to find font files: %w", err)
 	}
-	// lib, err := NewFreeTypeLibrary()
-	// if err != nil {
-	// 	return fmt.Errorf("failed to create FreeType library: %w", err)
-	// }
-	// defer lib.Close()
 
 	for _, fontPath := range fontPaths {
-		fontInfos, err := lib.ParseFont(fontPath, ignoreError)
+		fontInfos, err := fdb.lib.ParseFont(fontPath, ignoreError)
 		if err != nil {
 			if ignoreError {
 				continue
 			}
 			return fmt.Errorf("failed to parse font %s: %w", fontPath, err)
 		}
-		fp.FontListInDB[fontPath] = fontInfos
+		fdb.FontListInDB[fontPath] = fontInfos
 	}
 	return nil
 }
