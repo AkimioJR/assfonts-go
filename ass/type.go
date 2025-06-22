@@ -2,6 +2,8 @@ package ass
 
 import "errors"
 
+type None struct{}
+
 // RenameInfo 表示字体重命名信息
 type RenameInfo struct {
 	LineNum  uint64 // 样式行号
@@ -49,6 +51,6 @@ var (
 	ErrStyleParseFailed   = errors.New("failed to parse style") // 未找到 [V4 Styles] 等模块
 	ErrInvalidStyleFormat = errors.New("invalid style format")  // Styles 格式解析失败
 	ErrEventParseFailed   = errors.New("failed to parse event") // 未找到 [Events] 等模块
-	ErrInvalidEventFormat      = errors.New("invalid event format")  // Events 格式解析失败
+	ErrInvalidEventFormat = errors.New("invalid event format")  // Events 格式解析失败
 	ErrInvalidBoldValue   = errors.New("invalid bold value")
 )
