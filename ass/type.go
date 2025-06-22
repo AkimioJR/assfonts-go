@@ -37,14 +37,15 @@ type DialogueInfo struct {
 type FontDesc struct {
 	FontName string // 字体名称
 	Bold     uint   // 字粗
-	Italic   bool   // 是否启用斜体
+	Italic   uint   // 是否启用斜体，0->不启用
 }
 
 const (
 	defaultFontName     = "Default" // 默认字体名称
 	defaultFontSize     = 400       // 默认字体大小
 	defaultBoldFontSize = 700       // 默认粗细大小
-	defaultItalic       = false     // 默认不斜体
+	defaultItalic       = 0         // 默认不斜体
+	defaultItalicSlant  = 100       // 默认斜体倾斜度
 )
 
 var (
@@ -52,5 +53,6 @@ var (
 	ErrInvalidStyleFormat = errors.New("invalid style format")  // Styles 格式解析失败
 	ErrEventParseFailed   = errors.New("failed to parse event") // 未找到 [Events] 等模块
 	ErrInvalidEventFormat = errors.New("invalid event format")  // Events 格式解析失败
-	ErrInvalidBoldValue   = errors.New("invalid bold value")
+	ErrInvalidBoldValue   = errors.New("invalid bold value")    // 不合法字重值
+	ErrInvalidItalicValue = errors.New("invalid italic value")  // 不合法斜体值
 )

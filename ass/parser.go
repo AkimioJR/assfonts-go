@@ -190,12 +190,22 @@ func calculateBold(raw string) (uint, error) {
 }
 
 // 仅"1"和"-1"被认为是启用斜体
-func calculateItalic(raw string) (bool, error) {
+func calculateItalic(raw string) (uint, error) {
 	value, err := strconv.Atoi(raw)
 	if err != nil {
 		return defaultItalic, err
 	}
-	return value == 1 || value == -1, nil
+	switch value {
+	case 1, -1:
+		return defaultItalicSlant, nil
+	case 0:
+		return defaultItalic, nil
+	default:
+		if value < 0 {
+			return defaultItalic, ErrInvalidItalicValue
+		}
+		return uint(value), nil
+	}
 }
 
 func (ap *ASSParser) setStyleNameFontDesc() {
@@ -211,8 +221,8 @@ func (ap *ASSParser) setStyleNameFontDesc() {
 		fontname := strings.TrimPrefix(style.Style[2], "@") // 第三个字段是字体名称，去掉前缀 @（如果有的话）
 		fd := FontDesc{
 			FontName: fontname,
-			Bold:     400,   // 默认粗细大小
-			Italic:   false, // 默认不斜体
+			Bold:     400, // 默认粗细大小
+			Italic:   0,   // 默认不斜体
 		}
 		if len(style.Style) > 8 {
 			if bold, err := calculateBold(style.Style[8]); err == nil {
