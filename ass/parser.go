@@ -22,7 +22,7 @@ type ASSParser struct {
 
 func NewASSParser(reader io.Reader) (*ASSParser, error) {
 	ap := &ASSParser{
-		Texts:             make([]TextInfo, 200),
+		Texts:             make([]TextInfo, 0, 200),
 		RenameInfos:       make([]RenameInfo, 0, 10),
 		FontSets:          make(map[FontDesc]CodepointSet),
 		HasFonts:          false,
