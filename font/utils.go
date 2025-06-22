@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"time"
 
 	"golang.org/x/text/encoding"
 	"golang.org/x/text/encoding/charmap"
@@ -79,18 +78,6 @@ func contains[T comparable](list []T, s T) bool {
 		}
 	}
 	return false
-}
-
-const layout = "UTC 2006-01-02 15:04:05"
-
-var loc = time.UTC
-
-func parseTime(s string) (time.Time, error) {
-	return time.ParseInLocation(layout, s, loc)
-}
-
-func formatTime(t time.Time) string {
-	return t.In(loc).Format(layout)
 }
 
 var fontPattern = regexp.MustCompile(`(?i).+\.(ttf|otf|ttc|otc)$`)

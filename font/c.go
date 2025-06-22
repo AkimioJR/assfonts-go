@@ -56,38 +56,54 @@ func (lib *FreeTypeLibrary) Close() error {
 func (lib *FreeTypeLibrary) ParseFont(fontPath string, ignoreError bool) ([]FontInfo, error) {
 	fileInfo, err := os.Stat(fontPath)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("font file does not exist: %s", fontPath)
-		}
-		return nil, fmt.Errorf("error accessing font file: %s, error: %w", fontPath, err)
+		return nil, fmt.Errorf("failed to stat font file %s: %w", fontPath, err)
 	}
 
-	cFontPath := C.CString(fontPath)
-	defer C.free(unsafe.Pointer(cFontPath))
+	fontData, err := os.ReadFile(fontPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read font file %s: %w", fontPath, err)
+	}
+	cFontData := C.CBytes(fontData) // 将Go字节切片转换为C字节数组
+	defer C.free(cFontData)         // 确保在函数结束时释放C字节数组
 
-	var face C.FT_Face
+	var metaFace C.FT_Face
 
 	// 调用C函数解析字体
-	errCode := C.FT_New_Face(lib.ptr, cFontPath, 0, &face) // 0表示加载第一个字体
+	errCode := C.FT_New_Memory_Face(lib.ptr, (*C.FT_Byte)(cFontData), C.FT_Long(len(fontData)), 0, &metaFace) // 0表示加载第一个字体
 	if errCode != 0 {
 		return nil, fmt.Errorf("parse font error, error code: %d", int(errCode))
+	} else {
+		C.FT_Done_Face(metaFace) // 释放元字体对象
 	}
-	// defer C.FT_Done_Face(face) // 解析完成后释放face资源
 
-	facesNum := int(face.num_faces)            // 获取字体文件中的字体数量
+	facesNum := int64(metaFace.num_faces)      // 获取字体文件中的字体数量
 	fontInfos := make([]FontInfo, 0, facesNum) // 初始化字体信息切片
-	for idx := range facesNum {
-		// fmt.Println(idx, facesNum)
-		fontInfo, err := lib.parseFace(cFontPath, face, idx)
-		if err != nil && ignoreError {
+	for idx := 0; idx < int(facesNum); idx++ {
+		var face C.FT_Face = nil
+		errCode = C.FT_New_Memory_Face(lib.ptr, (*C.FT_Byte)(cFontData), C.FT_Long(len(fontData)), C.FT_Long(idx), &face)
+		if errCode != 0 {
+			if ignoreError {
+				continue // 如果忽略错误，跳过当前字体
+			}
+			return nil, fmt.Errorf("error creating face for font %s at index %d with error code %d", fontPath, idx, int(errCode))
+		} else {
+			defer C.FT_Done_Face(face)
+		}
+
+		fontInfo, err := lib.parseFace(face)
+		if err != nil {
+			if ignoreError {
+				continue // 如果忽略错误，跳过当前字体
+			}
 			return nil, fmt.Errorf("error parsing face at index %d: %w", idx, err)
 		}
 		if fontInfo != nil {
-			fontInfo.Index = int64(idx)                             // 设置字体索引
-			fontInfo.LastWriteTime = formatTime(fileInfo.ModTime()) // 设置最后写入时间
-			fontInfo.Path = fontPath                                // 设置字体文件路径
-			fontInfos = append(fontInfos, *fontInfo)                // 添加到字体信息切片
+			fontInfo.Index = int64(idx)                 // 设置字体索引
+			fontInfo.LastWriteTime = fileInfo.ModTime() // 设置最后写入时间
+			fontInfo.Path = fontPath                    // 设置字体文件路径
+			fontInfos = append(fontInfos, *fontInfo)    // 添加到字体信息切片
 		}
+
 	}
 
 	if len(fontInfos) == 0 {
@@ -96,38 +112,36 @@ func (lib *FreeTypeLibrary) ParseFont(fontPath string, ignoreError bool) ([]Font
 	return fontInfos, nil
 }
 
-func (lib *FreeTypeLibrary) parseFace(cFontPath *C.char, face C.FT_Face, idx int) (*FontInfo, error) {
+func (lib *FreeTypeLibrary) parseFace(face C.FT_Face) (*FontInfo, error) {
 	var (
-		openArgs  C.FT_Open_Args = newOpenArgs(cFontPath)
-		families  []string       = make([]string, 0) // 字体家族
-		fullnames []string       = make([]string, 0) // 字体全名
-		psnames   []string       = make([]string, 0) // PostScript字体名称
+		families  []string = make([]string, 0) // 字体家族
+		fullnames []string = make([]string, 0) // 字体全名
+		psnames   []string = make([]string, 0) // PostScript字体名称
 	)
 
-	if idx != 0 {
-		if errCode := C.FT_Open_Face(lib.ptr, &openArgs, C.FT_Long(idx), &face); errCode != 0 {
-			return nil, fmt.Errorf("error opening face at index %d with error code %d", idx, errCode)
-		}
-	}
+	// if C.FT_Has_PS_Glyph_Names(face) != 0 { // 检查是否有PostScript字形名称
+	// 	// var fontInfo C.PS_FontInfo = nil
+	// 	fontInfo := (C.PS_FontInfo)(C.malloc(C.sizeof_PS_FontInfo))
+	// 	defer C.free(unsafe.Pointer(fontInfo))
 
-	if C.FT_Has_PS_Glyph_Names(face) != 0 { // 检查是否有PostScript字形名称
-		fontInfo := (C.PS_FontInfo)(C.malloc(C.sizeof_PS_FontInfo))
-		defer C.free(unsafe.Pointer(fontInfo))
+	// 	if C.FT_Get_PS_Font_Info(face, fontInfo) == 0 { // 获取PostScript字体信息
+	// 		if fontInfo != nil {
+	// 			fmt.Println("PostScript Font Info found")
+	// 			fmt.Scanf("%s", &fontInfo) // 调试用，等待用户输入
+	// 			family := C.GoString((*C.char)(fontInfo.family_name))
+	// 			fullname := C.GoString((*C.char)(fontInfo.full_name))
+	// 			families = append(families, family)
+	// 			fullnames = append(fullnames, fullname)
+	// 		}
+	// 	}
+	// 	// 	fmt.Println("Error getting PS font info:", err)
 
-		if C.FT_Get_PS_Font_Info(face, fontInfo) == 0 { // 获取PostScript字体信息
-			family := C.GoString((*C.char)(fontInfo.family_name))
-			fullname := C.GoString((*C.char)(fontInfo.full_name))
-			families = append(families, family)
-			fullnames = append(fullnames, fullname)
-		}
-		// 	fmt.Println("Error getting PS font info:", err)
-
-	}
+	// }
 
 	// 	fmt.Println("No PS Glyph Names found in the font.")
-
-	for i := range C.FT_Get_Sfnt_Name_Count(face) {
-		if err := parseFontName(face, i, &families, &fullnames, &psnames); err != nil {
+	namesNum := int(C.FT_Get_Sfnt_Name_Count(face)) // 获取字体名称数量
+	for i := 0; i < namesNum; i++ {
+		if err := parseFontName(face, C.uint(i), &families, &fullnames, &psnames); err != nil {
 			if _, ok := err.(*UnsupportedIDError); ok {
 				// fmt.Println(err)
 				continue // 跳过不支持的名称ID
@@ -135,7 +149,7 @@ func (lib *FreeTypeLibrary) parseFace(cFontPath *C.char, face C.FT_Face, idx int
 				// fmt.Println(err)
 				continue // 跳过不支持的平台ID
 			}
-			return nil, fmt.Errorf("error parsing font name at index %d: %w", idx, err)
+			return nil, fmt.Errorf("error parsing font name at index %d: %w", i, err)
 		}
 	}
 
@@ -153,7 +167,6 @@ func (lib *FreeTypeLibrary) parseFace(cFontPath *C.char, face C.FT_Face, idx int
 		PSNames:   psnames,
 		Weight:    getAssFaceWeight(face),                             // 字重
 		Slant:     110 * int(face.style_flags&C.FT_STYLE_FLAG_ITALIC), // 0或110，斜体角度
-		Index:     0,
 	}
 	if fontInfo.Slant < 0 || fontInfo.Slant > 110 {
 		fontInfo.Slant = 0 // 如果斜体角度不在0-110范围内，设置为默认值0
@@ -162,21 +175,6 @@ func (lib *FreeTypeLibrary) parseFace(cFontPath *C.char, face C.FT_Face, idx int
 		fontInfo.Weight = 400 // 如果字重不在100-900范围内，设置为默认值400
 	}
 	return &fontInfo, nil
-}
-
-// 设置 FT_Open_Args 结构体
-func newOpenArgs(cFontPath *C.char) C.FT_Open_Args {
-	var args C.FT_Open_Args
-
-	args.flags = C.FT_OPEN_PATHNAME
-	args.memory_base = nil
-	args.memory_size = 0
-	args.pathname = cFontPath
-	args.stream = nil
-	args.driver = nil
-	args.num_params = 0
-	args.params = nil
-	return args
 }
 
 // 解析字体名称

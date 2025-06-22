@@ -29,7 +29,10 @@ func (fp *FontDataBase) BuildDB(lib *FreeTypeLibrary, fontsDirs []string, withDe
 
 	for _, fontPath := range fontPaths {
 		fontInfos, err := lib.ParseFont(fontPath, ignoreError)
-		if err != nil && !ignoreError {
+		if err != nil {
+			if ignoreError {
+				continue
+			}
 			return fmt.Errorf("failed to parse font %s: %w", fontPath, err)
 		}
 		fp.FontListInDB[fontPath] = fontInfos
