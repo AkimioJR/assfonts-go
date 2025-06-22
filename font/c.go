@@ -98,7 +98,7 @@ func (lib *FreeTypeLibrary) ParseFont(fontPath string, ignoreError bool) ([]Font
 			return nil, fmt.Errorf("error parsing face at index %d: %w", idx, err)
 		}
 		if fontInfo != nil {
-			fontInfo.Index = int64(idx)                 // 设置字体索引
+			fontInfo.Index = uint(idx)                  // 设置字体索引
 			fontInfo.LastWriteTime = fileInfo.ModTime() // 设置最后写入时间
 			fontInfo.Path = fontPath                    // 设置字体文件路径
 			fontInfos = append(fontInfos, *fontInfo)    // 添加到字体信息切片
@@ -165,8 +165,8 @@ func (lib *FreeTypeLibrary) parseFace(face C.FT_Face) (*FontInfo, error) {
 		Families:  families,
 		Fullnames: fullnames,
 		PSNames:   psnames,
-		Weight:    getAssFaceWeight(face),                             // 字重
-		Slant:     110 * int(face.style_flags&C.FT_STYLE_FLAG_ITALIC), // 0或110，斜体角度
+		Weight:    getAssFaceWeight(face),                              // 字重
+		Slant:     110 * uint(face.style_flags&C.FT_STYLE_FLAG_ITALIC), // 0或110，斜体角度
 	}
 	if fontInfo.Slant < 0 || fontInfo.Slant > 110 {
 		fontInfo.Slant = 0 // 如果斜体角度不在0-110范围内，设置为默认值0
@@ -275,7 +275,7 @@ func parseFontName(
 	return nil
 }
 
-func getAssFaceWeight(face C.FT_Face) int {
+func getAssFaceWeight(face C.FT_Face) uint {
 	os2 := C.FT_Get_Sfnt_Table(face, C.FT_SFNT_OS2) // 获取OS/2表
 
 	var os2Weight C.FT_UShort = 400 // 默认字重为400
@@ -286,7 +286,7 @@ func getAssFaceWeight(face C.FT_Face) int {
 
 	switch os2Weight { // 根据OS/2表的字重值返回对应的字重
 	case 0:
-		bold := 0
+		var bold uint = 0
 		if (face.style_flags & C.FT_STYLE_FLAG_BOLD) != 0 {
 			bold = 1
 		}
@@ -310,6 +310,6 @@ func getAssFaceWeight(face C.FT_Face) int {
 	case 9:
 		return 900
 	default:
-		return int(os2Weight)
+		return uint(os2Weight)
 	}
 }

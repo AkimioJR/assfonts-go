@@ -41,9 +41,9 @@ type FontInfo struct {
 	Families      []string  `json:"families"`        // 字体家族
 	Fullnames     []string  `json:"fullnames"`       // 全名
 	PSNames       []string  `json:"psnames"`         // PostScript 名称
-	Weight        int       `json:"weight"`          // 字重，默认400
-	Slant         int       `json:"slant"`           // 斜体角度，默认0
-	Index         int64     `json:"index"`           // 字体索引，C++ long 对应 Go int64
+	Weight        uint      `json:"weight"`          // 字重，默认400
+	Slant         uint      `json:"slant"`           // 斜体角度，默认0
+	Index         uint      `json:"index"`           // 字体索引
 	LastWriteTime time.Time `json:"last_write_time"` // 最后写入时间
 	Path          string    `json:"path"`            // 字体文件路径
 }
