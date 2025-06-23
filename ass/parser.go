@@ -535,3 +535,41 @@ func (ap *ASSParser) changeStyle(
 		localFD.Italic = updateFD.Italic
 	}
 }
+
+func (ap *ASSParser) WriteWithEmbeddedFonts(fontDatas map[string][]byte, writer io.Writer) error {
+	insertedFonts := false
+
+	writeOrErr := func(data []byte) error {
+		_, err := writer.Write(data)
+		return err
+	}
+
+	for _, text := range ap.Texts {
+		content := []byte(text.Text)
+		trimmed := bytes.TrimSpace(bytes.ToLower(content))
+		if !insertedFonts && bytes.Equal(trimmed, []byte("[events]")) {
+			if err := writeOrErr([]byte("[Fonts]")); err != nil {
+				return fmt.Errorf("embed ass error when write to writer: %w", err)
+			}
+			for fontName, fontData := range fontDatas {
+				if err := writeOrErr([]byte("\nfontname:" + fontName + "\n")); err != nil {
+					return fmt.Errorf("embed ass error when write to writer: %w", err)
+				}
+				if err := UUEncode(fontData, writer, true); err != nil {
+					return fmt.Errorf("embed ass error when write to writer: %w", err)
+				}
+			}
+			if err := writeOrErr([]byte("\n")); err != nil {
+				return fmt.Errorf("embed ass error when write to writer: %w", err)
+			}
+			insertedFonts = true
+		}
+		if err := writeOrErr(content); err != nil {
+			return fmt.Errorf("embed ass error when write to writer: %w", err)
+		}
+		if err := writeOrErr([]byte("\n")); err != nil {
+			return fmt.Errorf("embed ass error when write to writer: %w", err)
+		}
+	}
+	return nil
+}
