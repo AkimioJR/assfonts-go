@@ -60,8 +60,8 @@ func NewErrMissCodepoints(fontDesc *ass.FontDesc, missingCodepoints []rune) *Err
 }
 
 type FontFaceLocation struct {
-	Path  string // 字体文件路径
-	Index uint   // 字体集合中的索引位置
+	Path  string `json:"path"`  // 字体文件路径
+	Index uint   `json:"index"` // 字体集合中的索引位置
 }
 
 type FontFaceInfo struct {
