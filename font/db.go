@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 )
 
 type FontDataBase struct {
@@ -107,13 +108,70 @@ func (db *FontDataBase) Subset(ap *ass.ASSParser) (map[string][]byte, error) {
 	subFontDatas := make(map[string][]byte)
 
 	for _, sfi := range subsetFontInfos {
-		subFontData, err := CreatSubfont(&sfi)
+		key, subFontData, err := db.subset(&sfi)
 		if err != nil {
 			return nil, err
 		}
-		subFontDatas[sfi.FontsDesc.FontName+filepath.Ext(sfi.Source.Path)] = subFontData
+		subFontDatas[key] = subFontData
 	}
 	return subFontDatas, nil
+}
+
+func (db *FontDataBase) SubsetConcurrent(ap *ass.ASSParser) (map[string][]byte, error) {
+	subsetFontInfos, err := db.parseSubsetFontInfos(ap)
+	if err != nil {
+		return nil, fmt.Errorf("parse sub set info failed: %w", err)
+	}
+
+	type result struct {
+		key  string
+		data []byte
+	}
+
+	results := make(chan result, len(subsetFontInfos))
+	errChan := make(chan error, 1) // 只需缓冲1个错误
+
+	var wg sync.WaitGroup
+	wg.Add(len(subsetFontInfos))
+	for _, sfi := range subsetFontInfos {
+		go func() {
+			defer wg.Done()
+			key, subFontData, err := db.subset(&sfi)
+			if err != nil {
+				errChan <- err
+				return
+			}
+			results <- result{key, subFontData}
+		}()
+	}
+
+	// 关闭结果通道当所有工作完成时
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	// 收集结果并处理错误
+	subFontDatas := make(map[string][]byte, len(subsetFontInfos))
+	for r := range results {
+		subFontDatas[r.key] = r.data
+	}
+
+	// 检查是否有错误发生
+	select {
+	case err := <-errChan:
+		return nil, err
+	default:
+		return subFontDatas, nil
+	}
+}
+
+func (db *FontDataBase) subset(sfi *SubsetFontInfo) (string, []byte, error) {
+	subFontData, err := CreatSubfont(sfi)
+	if err != nil {
+		return "", nil, err
+	}
+	return sfi.FontsDesc.FontName + filepath.Ext(sfi.Source.Path), subFontData, nil
 }
 
 func (db *FontDataBase) parseSubsetFontInfos(ap *ass.ASSParser) ([]SubsetFontInfo, error) {
