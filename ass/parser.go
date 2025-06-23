@@ -478,12 +478,7 @@ func (ap *ASSParser) changeItalic(code string, fd *FontDesc) int {
 }
 
 // 处理 \r 样式还原
-func (ap *ASSParser) changeStyle(
-	code string,
-	localFD *FontDesc,
-	lineNum uint,
-	fontPos, boldPos, italicPos int,
-) {
+func (ap *ASSParser) changeStyle(code string, localFD *FontDesc, lineNum uint, fontPos int, boldPos int, italicPos int) {
 	pos := 0
 	lastPos := 0
 	updateFD := *localFD
@@ -543,7 +538,7 @@ func (ap *ASSParser) WriteWithEmbeddedFonts(fontDatas map[string][]byte, writer 
 				goto fail
 			}
 			for fontName, fontData := range fontDatas {
-				if _, err = writer.Write([]byte("\nfontname: " + fontName + "\n")); err != nil {
+				if _, err = writer.Write([]byte("\nfontname:" + fontName + "\n")); err != nil {
 					goto fail
 				}
 				if err = UUEncode(fontData, writer, true); err != nil {
