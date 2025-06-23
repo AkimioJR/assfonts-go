@@ -6,11 +6,10 @@ type CodepointSet map[rune]struct{}
 
 // RenameInfo 表示字体重命名信息
 type RenameInfo struct {
+	FontName string // 字体名（非样式名）
 	LineNum  uint64 // 样式行号
 	Begin    uint   // 字体名称在原始样式行中的起始的偏移量（字节偏移量）
 	End      uint   // 字体名称在原始样式行中结束位置的偏移量（字节偏移量）
-	FontName string
-	NewName  string
 }
 
 // TextInfo 表示文本行

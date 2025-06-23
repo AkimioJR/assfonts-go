@@ -2,6 +2,7 @@ package ass
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"io"
 	"strconv"
@@ -35,8 +36,7 @@ func NewASSParser(reader io.Reader) (*ASSParser, error) {
 	for scanner.Scan() {
 		lineNum++
 		line := scanner.Text() // 读取一行
-		trimmed := strings.TrimSpace(strings.ToLower(line))
-		if trimmed == "[fonts]" {
+		if strings.TrimSpace(strings.ToLower(line)) == "[fonts]" {
 			ap.HasFonts = true
 			ap.skipFontsLines(scanner, &lineNum) // 跳过字体块
 		} else {
@@ -61,6 +61,7 @@ func (ap *ASSParser) Parse() error {
 			if !ap.getStyles(&i) {
 				return ErrStyleParseFailed
 			}
+			ap.setStyleNameFontDesc() // 设置样式名称对应的字体描述
 			hasStyle = true
 		case startWith(line, "[Events]"):
 			i++ // 跳过事件标题行，开始读取下面的内容
@@ -78,7 +79,6 @@ func (ap *ASSParser) Parse() error {
 	if !hasEvent {
 		return ErrInvalidEventFormat
 	}
-	ap.setStyleNameFontDesc() // 设置样式名称对应的字体描述
 	if err := ap.setFontSets(); err != nil {
 		return fmt.Errorf("failed to set font sets: %w", err)
 	}
@@ -240,14 +240,11 @@ func (ap *ASSParser) setStyleNameFontDesc() {
 		}
 		ap.StyleNameFontDesc[styleName] = &fd // 保存样式名称对应的字体描述
 
-		// RenameInfo 相关
-		// Go 没有指针偏移，通常直接存储字段内容和行号
 		renameInfo := RenameInfo{
+			FontName: fontname,
 			LineNum:  style.LineNum,
 			Begin:    uint(strings.Index(style.RawContent, fontname)),
 			End:      uint(strings.Index(style.RawContent, fontname) + len(fontname)),
-			FontName: fontname,
-			NewName:  "",
 		}
 		ap.RenameInfos = append(ap.RenameInfos, renameInfo)
 	}
@@ -407,7 +404,6 @@ func (ap *ASSParser) changeFontname(code string, fd *FontDesc, lineNum uint, raw
 			Begin:    uint(beg),
 			End:      uint(end),
 			FontName: fontView,
-			NewName:  "",
 		}
 		ap.RenameInfos = append(ap.RenameInfos, renameInfo)
 	}
