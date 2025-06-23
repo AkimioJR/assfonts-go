@@ -84,6 +84,17 @@ func NewErrMissCodepoints(fontDesc *ass.FontDesc, source *FontFaceLocation, miss
 	}
 }
 
+type ErrUnSupportEncode string
+
+func NewErrUnSupportEncode(s string) *ErrUnSupportEncode {
+	var e = ErrUnSupportEncode(s)
+	return &e
+}
+
+func (e ErrUnSupportEncode) Error() string {
+	return fmt.Sprintf(`unsupport encoding type: "%s"`, string(e))
+}
+
 type WarningMsg string
 
 func NewWarningMsg(format string, a ...any) *WarningMsg {
@@ -95,4 +106,5 @@ func (w WarningMsg) Error() string {
 	return string(w)
 }
 
+var _ error = (*ErrUnSupportEncode)(nil)
 var _ error = (*WarningMsg)(nil)

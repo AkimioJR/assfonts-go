@@ -220,26 +220,31 @@ func parseSfntName(ftFace C.FT_Face, nameIdx C.uint, families, fullnames, psname
 
 	// 拷贝原始字节
 	wbuf := C.GoBytes(unsafe.Pointer(name.string), C.int(name.string_len))
-	buf := ""
+	var buf string
 
 	switch name.encoding_id {
 	case C.TT_MS_ID_PRC: // 微软简体中文编码
 		wbufn := bytes.ReplaceAll(wbuf, []byte{0}, nil)
-		if !IconvConvert(wbufn, &buf, "GB2312", "UTF-8") {
-			if !IconvConvert(wbuf, &buf, "UTF-16BE", "UTF-8") {
-				return nil
+		buf, err = iconvConvert(wbufn, "GB2312", "UTF-8")
+		if err != nil {
+			buf, err = iconvConvert(wbuf, "UTF-16BE", "UTF-8")
+			if err != nil {
+				return err
 			}
 		}
 	case C.TT_MS_ID_BIG_5: // 微软繁体中文编码
 		wbufn := bytes.ReplaceAll(wbuf, []byte{0}, nil)
-		if !IconvConvert(wbufn, &buf, "BIG-5", "UTF-8") {
-			if !IconvConvert(wbuf, &buf, "UTF-16BE", "UTF-8") {
-				return nil
+		buf, err = iconvConvert(wbufn, "BIG-5", "UTF-8")
+		if err != nil {
+			buf, err = iconvConvert(wbuf, "UTF-16BE", "UTF-8")
+			if err != nil {
+				return err
 			}
 		}
 	default:
-		if !IconvConvert(wbuf, &buf, "UTF-16BE", "UTF-8") {
-			return nil
+		buf, err = iconvConvert(wbuf, "UTF-16BE", "UTF-8")
+		if err != nil {
+			return err
 		}
 	}
 

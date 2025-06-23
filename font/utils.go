@@ -2,6 +2,7 @@ package font
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -21,8 +22,7 @@ func isDir(path string) bool {
 	return err == nil && fi.IsDir()
 }
 
-// IconvConvert 实现类似 C++ iconv 的功能
-func IconvConvert(in []byte, out *string, fromCode, toCode string) bool {
+func iconvConvert(in []byte, fromCode, toCode string) (string, error) {
 	var decoder *encoding.Decoder
 	var encoder *encoding.Encoder
 
@@ -39,7 +39,7 @@ func IconvConvert(in []byte, out *string, fromCode, toCode string) bool {
 	case "UTF-8":
 		decoder = encoding.Nop.NewDecoder()
 	default:
-		return false // 不支持的编码
+		return "", NewErrUnSupportEncode(fromCode) // 不支持的编码
 	}
 
 	// 选择编码器
@@ -47,27 +47,26 @@ func IconvConvert(in []byte, out *string, fromCode, toCode string) bool {
 	case "UTF-8":
 		encoder = encoding.Nop.NewEncoder()
 	default:
-		return false // 这里只实现转 UTF-8
+		return "", ErrUnSupportEncode(toCode) // 这里只实现转 UTF-8
 	}
 
 	// 解码
 	reader := transform.NewReader(bytes.NewReader(in), decoder)
 	decoded, err := io.ReadAll(reader)
 	if err != nil {
-		return false
+		return "", fmt.Errorf("read encoder error: %w", err)
 	}
 
 	// 编码
 	writer := &bytes.Buffer{}
 	encoderWriter := transform.NewWriter(writer, encoder)
+	defer encoderWriter.Close()
 	_, err = encoderWriter.Write(decoded)
 	if err != nil {
-		return false
+		return "", fmt.Errorf("write encoder error: %w", err)
 	}
-	encoderWriter.Close()
 
-	*out = writer.String()
-	return true
+	return writer.String(), nil
 }
 
 func contains[T comparable](list []T, s T) bool {
