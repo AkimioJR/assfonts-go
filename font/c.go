@@ -148,10 +148,10 @@ func (lib *FreeTypeLibrary) parseFace(face C.FT_Face) (*FontFaceInfo, error) {
 	namesNum := int(C.FT_Get_Sfnt_Name_Count(face)) // 获取字体名称数量
 	for i := 0; i < namesNum; i++ {
 		if err := parseFontName(face, C.uint(i), &families, &fullnames, &psnames); err != nil {
-			if _, ok := err.(*UnsupportedIDError); ok {
+			if _, ok := err.(*ErrUnsupportedID); ok {
 				// fmt.Println(err)
 				continue // 跳过不支持的名称ID
-			} else if _, ok := err.(*UnsupportedPlatformError); ok {
+			} else if _, ok := err.(*ErrUnsupportedPlatform); ok {
 				// fmt.Println(err)
 				continue // 跳过不支持的平台ID
 			}
@@ -201,7 +201,7 @@ func parseFontName(
 	if name.name_id != C.TT_NAME_ID_FULL_NAME &&
 		name.name_id != C.TT_NAME_ID_FONT_FAMILY &&
 		name.name_id != C.TT_NAME_ID_PS_NAME {
-		return &UnsupportedPlatformError{uint16(name.name_id)}
+		return &ErrUnsupportedPlatform{uint16(name.name_id)}
 	}
 	// fmt.Println("no skip name id:", name.name_id)
 
@@ -213,7 +213,7 @@ func parseFontName(
 	// 4->TT_PLATFORM_CUSTOM Custom平台
 	// 5->TT_PLATFORM_ADOBE Adobe平台
 	if name.platform_id != C.TT_PLATFORM_MICROSOFT {
-		return &UnsupportedPlatformError{uint16(name.platform_id)}
+		return &ErrUnsupportedPlatform{uint16(name.platform_id)}
 	}
 	// fmt.Println("no skip platform id:", name.platform_id)
 

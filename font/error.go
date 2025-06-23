@@ -12,19 +12,19 @@ var (
 	ErrNoContainFace   = errors.New("font contains no valid faces")
 )
 
-type UnsupportedIDError struct {
+type ErrUnsupportedID struct {
 	platformID uint16
 }
 
-func (e *UnsupportedIDError) Error() string {
+func (e *ErrUnsupportedID) Error() string {
 	return fmt.Sprintf("skipping name with ID %d", e.platformID)
 }
 
-type UnsupportedPlatformError struct {
+type ErrUnsupportedPlatform struct {
 	platformID uint16
 }
 
-func (e *UnsupportedPlatformError) Error() string {
+func (e *ErrUnsupportedPlatform) Error() string {
 	return fmt.Sprintf("skipping name with platform ID %d", e.platformID)
 }
 
