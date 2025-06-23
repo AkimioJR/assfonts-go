@@ -1,16 +1,8 @@
 package font
 
 import (
-	"errors"
-	"fmt"
 	"github/Akimio521/assfonts-go/ass"
 	"time"
-)
-
-var (
-	ErrNoValidFontName = errors.New("no valid font names found")
-	ErrNoValidFontFace = errors.New("no valid font face found")
-	ErrNoContainFace   = errors.New("font contains no valid faces")
 )
 
 // 这是标准 ASCII 可打印字符区间，包括空格（0x20）、数字、英文字母、常用标点符号等，一直到波浪号 ~（0x7e）
@@ -24,38 +16,6 @@ func init() {
 	}
 	for ch := rune(0xff01); ch <= 0xff5e; ch++ {
 		additionalCodepoints = append(additionalCodepoints, ch)
-	}
-}
-
-type UnsupportedIDError struct {
-	platformID uint16
-}
-
-func (e *UnsupportedIDError) Error() string {
-	return fmt.Sprintf("skipping name with ID %d", e.platformID)
-}
-
-type UnsupportedPlatformError struct {
-	platformID uint16
-}
-
-func (e *UnsupportedPlatformError) Error() string {
-	return fmt.Sprintf("skipping name with platform ID %d", e.platformID)
-}
-
-type ErrMissCodepoints struct {
-	fontDesc          ass.FontDesc
-	missingCodepoints []rune
-}
-
-func (e *ErrMissCodepoints) Error() string {
-	return fmt.Sprintf(`missing codepoints for face "%s" (%d,%d) : %v`, e.fontDesc.FontName, e.fontDesc.Bold, e.fontDesc.Italic, formatCodepoints(e.missingCodepoints))
-}
-
-func NewErrMissCodepoints(fontDesc *ass.FontDesc, missingCodepoints []rune) *ErrMissCodepoints {
-	return &ErrMissCodepoints{
-		fontDesc:          *fontDesc,
-		missingCodepoints: missingCodepoints,
 	}
 }
 
