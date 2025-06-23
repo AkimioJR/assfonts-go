@@ -92,11 +92,9 @@ func (lib *FreeTypeLibrary) ParseFont(fontPath string, ignoreError bool) ([]Font
 				continue // 如果忽略错误，跳过当前字体
 			}
 			return nil, fmt.Errorf("error creating face for font %s at index %d with error code %d", fontPath, idx, int(errCode))
-		} else {
-			defer C.FT_Done_Face(face)
 		}
-
 		fontFaceInfo, err := lib.parseFace(face)
+		C.FT_Done_Face(face)
 		if err != nil {
 			if ignoreError {
 				continue // 如果忽略错误，跳过当前字体
