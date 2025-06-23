@@ -21,6 +21,48 @@ type ASSParser struct {
 	StyleNameFontDesc map[string]*FontDesc      // 样式描述
 }
 
+func NewASSParserWithParse(reader io.Reader) (*ASSParser, error) {
+	ap := &ASSParser{
+		Texts:             make([]TextInfo, 0, 200),
+		RenameInfos:       make([]RenameInfo, 0, 10),
+		FontSets:          make(map[FontDesc]CodepointSet),
+		HasFonts:          false,
+		HasDefaultStyle:   false,
+		StyleNameFontDesc: make(map[string]*FontDesc),
+	}
+
+	var (
+		inStyleSection bool // 标记是否在样式区块中
+		inEventSection bool // 标记是否在事件区块中
+		hasStyle       bool // 标记是否解析到样式
+		hasEvent       bool // 标记是否解析到事件
+	)
+
+	var lineNum uint = 0
+
+	scanner := bufio.NewScanner(reader)
+	for scanner.Scan() {
+		lineNum++
+		line := scanner.Text() // 读取一行
+		if strings.TrimSpace(strings.ToLower(line)) == "[fonts]" {
+			ap.HasFonts = true
+			ap.skipFontsLines(scanner, &lineNum) // 跳过字体块
+		} else {
+			ti := TextInfo{LineNum: lineNum, Text: line}
+			ap.Texts = append(ap.Texts, ti) // 将行添加到文本信息中
+			err := ap.parseTxet(&ti, &inStyleSection, &inEventSection, &hasStyle, &hasEvent)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse text at line %d: %w", lineNum, err)
+			}
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("failed to new ASSParser: %w", err)
+	}
+
+	ap.cleanFontSets()
+	return ap, nil
+}
 func NewASSParser(reader io.Reader) (*ASSParser, error) {
 	ap := &ASSParser{
 		Texts:             make([]TextInfo, 0, 200),
@@ -44,45 +86,9 @@ func NewASSParser(reader io.Reader) (*ASSParser, error) {
 		}
 	}
 	if err := scanner.Err(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to new ASSParser: %w", err)
 	}
 	return ap, nil
-}
-
-// 开始解析数据
-func (ap *ASSParser) Parse() error {
-	hasStyle := false
-	hasEvent := false
-	for i := 0; i < len(ap.Texts); {
-		line := ap.Texts[i].Text
-		switch {
-		case startWith(line, "[V4+ Styles]"), startWith(line, "[V4 Styles]"):
-			i++ // 跳过样式标题行，开始读取下面的内容
-			if !ap.getStyles(&i) {
-				return ErrStyleParseFailed
-			}
-			ap.setStyleNameFontDesc() // 设置样式名称对应的字体描述
-			hasStyle = true
-		case startWith(line, "[Events]"):
-			i++ // 跳过事件标题行，开始读取下面的内容
-			if !ap.getEvents(&i) {
-				return ErrEventParseFailed
-			}
-			hasEvent = true
-		default:
-			i++
-		}
-	}
-	if !hasStyle {
-		return ErrInvalidStyleFormat
-	}
-	if !hasEvent {
-		return ErrInvalidEventFormat
-	}
-	if err := ap.setFontSets(); err != nil {
-		return fmt.Errorf("failed to set font sets: %w", err)
-	}
-	return nil
 }
 
 // skipFontsLines 跳过 [Fonts] 区块
@@ -101,58 +107,102 @@ func (ap *ASSParser) skipFontsLines(scanner *bufio.Scanner, lineNum *uint) {
 	}
 }
 
-// 文本行中提取样式（Style）信息
-// 解析成功返回 true，否则返回 false
-// 注意：此方法会修改 idx 的值，指向下一个未处理的行
-func (ap *ASSParser) getStyles(idx *int) bool {
-	for ; *idx < len(ap.Texts); *idx++ {
-		lineContent := ap.Texts[*idx].Text // 获取当前行内容
-		if startWith(lineContent, "[") {
-			break
+func (ap *ASSParser) Parse() error {
+	var (
+		inStyleSection bool // 标记是否在样式区块中
+		inEventSection bool // 标记是否在事件区块中
+		hasStyle       bool // 标记是否解析到样式
+		hasEvent       bool // 标记是否解析到事件
+	)
+
+	for _, ti := range ap.Texts {
+		err := ap.parseTxet(&ti, &inStyleSection, &inEventSection, &hasStyle, &hasEvent)
+		if err != nil {
+			return fmt.Errorf("failed to parse text at line %d: %w", ti.LineNum, err)
 		}
-		if !startWith(lineContent, "Style:") {
-			continue
-		}
-		styles := parseLine(lineContent, 10)
-		if styles == nil {
-			return false
-		}
-		ap.Styles = append(ap.Styles, StyleInfo{
-			LineNum:    uint64(ap.Texts[*idx].LineNum),
-			RawContent: lineContent,
-			Style:      styles,
-		})
 	}
-	return true
+
+	// 验证必要区块
+	if !hasStyle {
+		return ErrStyleParseFailed
+	}
+	if !hasEvent {
+		return ErrEventParseFailed
+	}
+	ap.cleanFontSets()
+	return nil
 }
 
-// 解析事件部分
-// 解析成功返回 true，否则返回 false
-// 注意：此方法会修改 idx 的值，指向下一个未处理的行
-func (ap *ASSParser) getEvents(idx *int) bool {
-	for ; *idx < len(ap.Texts); *idx++ {
-		lineContent := ap.Texts[*idx].Text // 获取当前行内容
-		if startWith(lineContent, "[") {   // 解析到下一个以 "[" 开头的行，停止解析（下一个区域）
-			break
-		}
-		if !startWith(lineContent, "Dialogue:") {
-			continue
-		}
-		dialogue := parseLine(lineContent, 10)
-		if dialogue == nil {
-			return false
-		}
-		ap.Dialogues = append(ap.Dialogues, DialogueInfo{
-			LineNum:    uint(ap.Texts[*idx].LineNum),
-			RawContent: lineContent,
-			Dialogue:   dialogue,
-		})
+func (ap *ASSParser) parseTxet(text *TextInfo, inStyleSection *bool, inEventSection *bool, hasStyle *bool, hasEvent *bool) error {
+	// 检查区块开始
+	switch {
+	case startWith(text.Text, "[V4+ Styles]"), startWith(text.Text, "[V4 Styles]"):
+		*inStyleSection = true
+		*inEventSection = false
+		return nil
+
+	case startWith(text.Text, "[Events]"):
+		*inEventSection = true
+		*inStyleSection = false
+		return nil
+	case startWith(text.Text, "["):
+		*inStyleSection = false
+		*inEventSection = false
 	}
-	return true
+
+	// 根据当前状态处理行
+	switch {
+	case *inStyleSection && startWith(text.Text, "Style:"):
+		err := ap.parseStyleLine(text)
+		if err != nil {
+			return ErrInvalidStyleFormat
+		}
+		*hasStyle = true
+
+	case *inEventSection && startWith(text.Text, "Dialogue:"):
+		err := ap.parseEventLine(text)
+		if err != nil {
+			return err
+		}
+		*hasEvent = true
+	}
+	return nil
+}
+
+// 解析单行样式
+func (ap *ASSParser) parseStyleLine(text *TextInfo) error {
+	fields := parseLine(text.Text, 10)
+	if fields == nil {
+		return ErrInvalidStyleFormat
+	}
+
+	si := StyleInfo{
+		LineNum:    text.LineNum,
+		RawContent: text.Text,
+		Style:      fields,
+	}
+	ap.Styles = append(ap.Styles, si)
+	ap.setStyleNameFontDesc(&si)
+	return nil
+}
+
+// 解析单行事件
+func (ap *ASSParser) parseEventLine(text *TextInfo) error {
+	fields := parseLine(text.Text, 10)
+	if fields == nil {
+		return ErrInvalidEventFormat
+	}
+	di := DialogueInfo{
+		LineNum:    text.LineNum,
+		RawContent: text.Text,
+		Dialogue:   fields,
+	}
+	ap.Dialogues = append(ap.Dialogues, di)
+	return ap.parseDialogue(&di)
 }
 
 // 解析类似于 Style: 或 Dialogue: 这样的 ASS 行，将其各个属性分割出来
-// 返回切片的长度不会超过 numField
+// 返回切片的长度不会小于 numField
 func parseLine(line string, numField int) []string {
 	// Style: Default,方正准圆_GBK,48,&H00FFFFFF,&HF0000000,&H00665806,&H0058281B,0,0,0,0,100,100,1,0,1,2,0,2,30,30,10,1
 
@@ -208,77 +258,74 @@ func calculateItalic(raw string) (uint, error) {
 	}
 }
 
-func (ap *ASSParser) setStyleNameFontDesc() {
+func (ap *ASSParser) setStyleNameFontDesc(style *StyleInfo) {
 	// Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
 	// Style: Default,方正准圆_GBK,48,&H00FFFFFF,&HF0000000,&H00665806,&H0058281B,0,0,0,0,100,100,1,0,1,2,0,2,30,30,10,1
 
-	for _, style := range ap.Styles {
-		if len(style.Style) > 1 && style.Style[1] == defaultFontName { // 检查是否为 Default 样式
-			ap.HasDefaultStyle = true
-		}
-
-		styleName := style.Style[1]                         // 第二个字段是样式名称
-		fontname := strings.TrimPrefix(style.Style[2], "@") // 第三个字段是字体名称，去掉前缀 @（如果有的话）
-		fd := FontDesc{
-			FontName: fontname,
-			Bold:     400, // 默认粗细大小
-			Italic:   0,   // 默认不斜体
-		}
-		if len(style.Style) > 8 {
-			if bold, err := calculateBold(style.Style[8]); err == nil {
-				fd.Bold = bold // 计算粗体大小
-			} else {
-				fd.Bold = defaultFontSize // 如果计算失败，使用默认值
-			}
-		}
-		if len(style.Style) > 9 {
-			if italic, err := calculateItalic(style.Style[9]); err == nil {
-				fd.Italic = italic // 是否启用斜体
-			} else {
-				fd.Italic = defaultItalic // 如果计算失败，使用默认值
-			}
-		}
-		ap.StyleNameFontDesc[styleName] = &fd // 保存样式名称对应的字体描述
-
-		renameInfo := RenameInfo{
-			FontName: fontname,
-			LineNum:  style.LineNum,
-			Begin:    uint(strings.Index(style.RawContent, fontname)),
-			End:      uint(strings.Index(style.RawContent, fontname) + len(fontname)),
-		}
-		ap.RenameInfos = append(ap.RenameInfos, renameInfo)
+	if len(style.Style) > 1 && style.Style[1] == defaultFontName { // 检查是否为 Default 样式
+		ap.HasDefaultStyle = true
 	}
+
+	styleName := style.Style[1]                         // 第二个字段是样式名称
+	fontname := strings.TrimPrefix(style.Style[2], "@") // 第三个字段是字体名称，去掉前缀 @（如果有的话）
+	fd := FontDesc{
+		FontName: fontname,
+		Bold:     400, // 默认粗细大小
+		Italic:   0,   // 默认不斜体
+	}
+	if len(style.Style) > 8 {
+		if bold, err := calculateBold(style.Style[8]); err == nil {
+			fd.Bold = bold // 计算粗体大小
+		} else {
+			fd.Bold = defaultFontSize // 如果计算失败，使用默认值
+		}
+	}
+	if len(style.Style) > 9 {
+		if italic, err := calculateItalic(style.Style[9]); err == nil {
+			fd.Italic = italic // 是否启用斜体
+		} else {
+			fd.Italic = defaultItalic // 如果计算失败，使用默认值
+		}
+	}
+	ap.StyleNameFontDesc[styleName] = &fd // 保存样式名称对应的字体描述
+
+	renameInfo := RenameInfo{
+		FontName: fontname,
+		LineNum:  style.LineNum,
+		Begin:    uint(strings.Index(style.RawContent, fontname)),
+		End:      uint(strings.Index(style.RawContent, fontname) + len(fontname)),
+	}
+	ap.RenameInfos = append(ap.RenameInfos, renameInfo)
 }
 
 // 统计每种字体样式实际用到的字符集合
-func (ap *ASSParser) setFontSets() error {
-	// emptySet := make(map[rune]struct{})
+func (ap *ASSParser) parseDialogue(dialogue *DialogueInfo) error {
+	fd, err := ap.getFontDescStyle(dialogue)
+	if err != nil {
+		return fmt.Errorf("failed to get font description style for dialogue at line %d: %w", dialogue.LineNum, err)
+	}
+	localFD := *fd // 复制字体描述，避免修改原始数据
 
-	for _, dialogue := range ap.Dialogues {
-		fd, err := ap.getFontDescStyle(&dialogue)
-		if err != nil {
-			return fmt.Errorf("failed to get font description style for dialogue at line %d: %w", dialogue.LineNum, err)
-		}
-		localFD := *fd // 复制字体描述，避免修改原始数据
-
-		// 初始化字体集合
-		if _, ok := ap.FontSets[*fd]; !ok {
-			ap.FontSets[*fd] = make(CodepointSet)
-		}
-
-		if len(dialogue.Dialogue) < 10 {
-			// fmt.Println("Dialogue at line", dialogue.LineNum, "has no text content, skipping.", "\nrawContent:", dialogue.RawContent, "\nDialogue:", strings.Join(dialogue.Dialogue, "---"), "\nNum:", len(dialogue.Dialogue))
-			continue // 如果没有对话文本内容就跳过
-		}
-
-		runes := []rune(dialogue.Dialogue[9])
-		idx := 0
-		for idx < len(runes) {
-			idx = ap.gatherCharacter(runes, idx, &localFD, dialogue.LineNum, &dialogue.RawContent)
-		}
+	// 初始化字体集合
+	if _, ok := ap.FontSets[*fd]; !ok {
+		ap.FontSets[*fd] = make(CodepointSet)
 	}
 
-	// 删除空的字体集合
+	if len(dialogue.Dialogue) < 10 {
+		// fmt.Println("Dialogue at line", dialogue.LineNum, "has no text content, skipping.", "\nrawContent:", dialogue.RawContent, "\nDialogue:", strings.Join(dialogue.Dialogue, "---"), "\nNum:", len(dialogue.Dialogue))
+		return nil // 如果没有对话文本内容就跳过
+	}
+
+	runes := []rune(dialogue.Dialogue[9])
+	idx := 0
+	for idx < len(runes) {
+		idx = ap.gatherCharacter(runes, idx, &localFD, dialogue.LineNum, &dialogue.RawContent)
+	}
+	return nil
+}
+
+// 删除空的字体集合
+func (ap *ASSParser) cleanFontSets() {
 	keysForDel := []FontDesc{}
 	for fontDesc, set := range ap.FontSets {
 		if len(set) == 0 {
@@ -288,7 +335,6 @@ func (ap *ASSParser) setFontSets() error {
 	for _, key := range keysForDel {
 		delete(ap.FontSets, key)
 	}
-	return nil
 }
 
 // 获取对话对应的字体样式
@@ -400,7 +446,7 @@ func (ap *ASSParser) changeFontname(code string, fd *FontDesc, lineNum uint, raw
 			end = beg + len(fontView)
 		}
 		renameInfo := RenameInfo{
-			LineNum:  uint64(lineNum),
+			LineNum:  lineNum,
 			Begin:    uint(beg),
 			End:      uint(end),
 			FontName: fontView,

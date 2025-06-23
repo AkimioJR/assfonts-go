@@ -7,7 +7,7 @@ type CodepointSet map[rune]struct{}
 // RenameInfo 表示字体重命名信息
 type RenameInfo struct {
 	FontName string // 字体名（非样式名）
-	LineNum  uint64 // 样式行号
+	LineNum  uint   // 样式行号
 	Begin    uint   // 字体名称在原始样式行中的起始的偏移量（字节偏移量）
 	End      uint   // 字体名称在原始样式行中结束位置的偏移量（字节偏移量）
 }
@@ -20,7 +20,7 @@ type TextInfo struct {
 
 // StyleInfo 对应 ASS 样式信息
 type StyleInfo struct {
-	LineNum    uint64   // 行号
+	LineNum    uint     // 行号
 	RawContent string   // 原始内容
 	Style      []string // 切分的字段
 }
