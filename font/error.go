@@ -11,6 +11,7 @@ var (
 	ErrNoValidFontFace = errors.New("no valid font face found")
 	ErrNoContainFace   = errors.New("font contains no valid faces")
 	ErrEmptySubsetData = errors.New("no subset font data collected")
+	ErrNoFontFileFound = errors.New("no font files found")
 )
 
 type ErrUnsupportedID struct {

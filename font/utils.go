@@ -2,7 +2,6 @@ package font
 
 import (
 	"bytes"
-	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -105,7 +104,7 @@ func findFontFiles(fontsDirs []string, withSystemFontPath bool) ([]string, error
 		})
 	}
 	if len(fontsPath) == 0 {
-		return nil, errors.New("no font files found")
+		return nil, ErrNoFontFileFound
 	}
 	return fontsPath, nil
 }
