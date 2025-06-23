@@ -94,7 +94,12 @@ func findFontFiles(fontsDirs []string, withSystemFontPath bool) ([]string, error
 				return nil // 忽略错误
 			}
 			if !d.IsDir() && fontPattern.MatchString(d.Name()) {
-				fontsPath = append(fontsPath, path)
+				absPath, err := filepath.Abs(path)
+				if err != nil {
+					fontsPath = append(fontsPath, path)
+				} else {
+					fontsPath = append(fontsPath, absPath)
+				}
 			}
 			return nil
 		})
