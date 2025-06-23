@@ -174,18 +174,18 @@ func (lib *FreeTypeLibrary) parseFace(face C.FT_Face, fn func(error) bool) (*Fon
 	return &fontFaceInfo, nil
 }
 
-func ftGetSfntName(ftFace C.FT_Face, nameIdx C.uint, name *C.FT_SfntName) error {
-	c := C.FT_Get_Sfnt_Name(ftFace, nameIdx, name)
+func ftGetSfntName(ftFace C.FT_Face, nameIdx C.uint) (*C.FT_SfntName, error) {
+	var name C.FT_SfntName
+	c := C.FT_Get_Sfnt_Name(ftFace, nameIdx, &name)
 	if c != 0 {
-		return NewErrGetSFNTName(uint(ftFace.face_index), uint(nameIdx), int(c))
+		return nil, NewErrGetSFNTName(uint(ftFace.face_index), uint(nameIdx), int(c))
 	}
-	return nil
+	return &name, nil
 }
 
 // 解析Sfnt名称
 func parseSfntName(ftFace C.FT_Face, nameIdx C.uint, families, fullnames, psnames *[]string) error {
-	var name C.FT_SfntName
-	err := ftGetSfntName(ftFace, nameIdx, &name) // 获取字体名称
+	name, err := ftGetSfntName(ftFace, nameIdx)
 	if err != nil {
 		return err
 	}
