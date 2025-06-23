@@ -269,12 +269,12 @@ func (ap *ASSParser) setFontSets() error {
 			ap.FontSets[*fd] = make(CodepointSet)
 		}
 
-		// 解析第11个字段（即对话文本内容）
-		if len(dialogue.Dialogue) <= 10 {
+		if len(dialogue.Dialogue) < 10 {
+			// fmt.Println("Dialogue at line", dialogue.LineNum, "has no text content, skipping.", "\nrawContent:", dialogue.RawContent, "\nDialogue:", strings.Join(dialogue.Dialogue, "---"), "\nNum:", len(dialogue.Dialogue))
 			continue // 如果没有对话文本内容就跳过
 		}
 
-		runes := []rune(dialogue.Dialogue[10])
+		runes := []rune(dialogue.Dialogue[9])
 		idx := 0
 		for idx < len(runes) {
 			idx = ap.gatherCharacter(runes, idx, &localFD, dialogue.LineNum, &dialogue.RawContent)
