@@ -8,7 +8,7 @@ package font
 #include <ft2build.h>
 #include FT_FREETYPE_H // <freetype/freetype.h>
 #include FT_TYPE1_TABLES_H // <freetype/t1tables.h>
-#include FT_SFNT_NAMES_H // <freetype/ttnameid.h>
+#include FT_TRUETYPE_IDS_H // <freetype/ttnameid.h>
 #include FT_TRUETYPE_TABLES_H // <freetype/tttables.h>
 #include FT_SFNT_NAMES_H // <freetype/ftsnames.h>
 
@@ -201,9 +201,9 @@ func parseFontName(
 	// 4->TT_NAME_ID_FULL_NAME字体全名
 	// 5->TT_NAME_ID_VERSION版本
 	// 6->TT_NAME_ID_PS_NAME PostScript字体名称
-	if name.name_id != TT_NAME_ID_FULL_NAME &&
-		name.name_id != TT_NAME_ID_FONT_FAMILY &&
-		name.name_id != TT_NAME_ID_PS_NAME {
+	if name.name_id != C.TT_NAME_ID_FULL_NAME &&
+		name.name_id != C.TT_NAME_ID_FONT_FAMILY &&
+		name.name_id != C.TT_NAME_ID_PS_NAME {
 		return &UnsupportedPlatformError{uint16(name.name_id)}
 	}
 	// fmt.Println("no skip name id:", name.name_id)
@@ -215,7 +215,7 @@ func parseFontName(
 	// 3->TT_PLATFORM_MICROSOFT Microsoft平台
 	// 4->TT_PLATFORM_CUSTOM Custom平台
 	// 5->TT_PLATFORM_ADOBE Adobe平台
-	if name.platform_id != TT_PLATFORM_MICROSOFT {
+	if name.platform_id != C.TT_PLATFORM_MICROSOFT {
 		return &UnsupportedPlatformError{uint16(name.platform_id)}
 	}
 	// fmt.Println("no skip platform id:", name.platform_id)
@@ -225,14 +225,14 @@ func parseFontName(
 	buf := ""
 
 	switch name.encoding_id {
-	case TT_MS_ID_PRC: // 微软简体中文编码
+	case C.TT_MS_ID_PRC: // 微软简体中文编码
 		wbufn := bytes.ReplaceAll(wbuf, []byte{0}, nil)
 		if !IconvConvert(wbufn, &buf, "GB2312", "UTF-8") {
 			if !IconvConvert(wbuf, &buf, "UTF-16BE", "UTF-8") {
 				return nil
 			}
 		}
-	case TT_MS_ID_BIG_5: // 微软繁体中文编码
+	case C.TT_MS_ID_BIG_5: // 微软繁体中文编码
 		wbufn := bytes.ReplaceAll(wbuf, []byte{0}, nil)
 		if !IconvConvert(wbufn, &buf, "BIG-5", "UTF-8") {
 			if !IconvConvert(wbuf, &buf, "UTF-16BE", "UTF-8") {
@@ -253,21 +253,21 @@ func parseFontName(
 	// fmt.Println("wbuf:", string(wbuf), "buf:", buf)
 
 	switch name.name_id { // 根据名称ID处理不同的名称
-	case TT_NAME_ID_FONT_FAMILY: // 字体家族名称
+	case C.TT_NAME_ID_FONT_FAMILY: // 字体家族名称
 		if !contains(*families, buf) {
 			family := strings.ToLower(buf)
 			if family != "" && family != "undefined" {
 				*families = append(*families, family)
 			}
 		}
-	case TT_NAME_ID_FULL_NAME: // 字体全名
+	case C.TT_NAME_ID_FULL_NAME: // 字体全名
 		if !contains(*fullnames, buf) {
 			fullname := strings.ToLower(buf)
 			if fullname != "" && fullname != "undefined" {
 				*fullnames = append(*fullnames, fullname)
 			}
 		}
-	case TT_NAME_ID_PS_NAME: // PostScript字体名称
+	case C.TT_NAME_ID_PS_NAME: // PostScript字体名称
 		if !contains(*psnames, buf) {
 			psname := strings.ToLower(buf)
 			if psname != "" && psname != "undefined" {

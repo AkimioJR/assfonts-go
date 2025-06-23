@@ -7,15 +7,6 @@ import (
 	"time"
 )
 
-const (
-	TT_NAME_ID_FONT_FAMILY = 1  // 字体家族名称
-	TT_NAME_ID_FULL_NAME   = 4  // 字体全名
-	TT_NAME_ID_PS_NAME     = 6  // PostScript字体名称
-	TT_PLATFORM_MICROSOFT  = 3  // 微软平台ID
-	TT_MS_ID_PRC           = 21 // 微软简体中文编码ID
-	TT_MS_ID_BIG_5         = 3  // 微软繁体中文编码ID
-)
-
 var (
 	ErrNoValidFontName = errors.New("no valid font names found")
 	ErrNoValidFontFace = errors.New("no valid font face found")
