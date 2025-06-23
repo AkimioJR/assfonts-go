@@ -227,12 +227,12 @@ func (db *FontDataBase) parseSubsetFontInfos(ap *ass.ASSParser, fn func(error) b
 	for fontDesc, fontSet := range ap.FontSets {
 		// fmt.Println(fontDesc)
 		codepointSet := make(ass.CodepointSet)
-		fontPath, err := db.FindFont(&fontDesc, fontSet)
+		fontPath, errValue, err := db.FindFont(&fontDesc, fontSet)
 		if err != nil {
 			return nil, err
 		}
 		if fn != nil {
-			fn(NewInfoMsg(`"%s" (%d,%d) ---> "%s"[%d]`, fontDesc.FontName, fontDesc.Bold, fontDesc.Italic, fontPath.Path, fontPath.Index))
+			fn(NewInfoMsg(`"%s" (%d,%d) ---> "%s"[%d], error value: %d`, fontDesc.FontName, fontDesc.Bold, fontDesc.Italic, fontPath.Path, fontPath.Index, errValue))
 		}
 
 		for wch := range fontSet {
@@ -255,7 +255,7 @@ var (
 	otfExts = []string{".otf", ".otc"}
 )
 
-func (db *FontDataBase) FindFont(fontDesc *ass.FontDesc, fontSet ass.CodepointSet) (*FontFaceLocation, *ErrMissingFontFaceFound) {
+func (db *FontDataBase) FindFont(fontDesc *ass.FontDesc, fontSet ass.CodepointSet) (*FontFaceLocation, int, *ErrMissingFontFaceFound) {
 	targetName := strings.ToLower(fontDesc.FontName)
 
 	find := func(acceptExts []string) (*FontFaceLocation, int) {
@@ -294,26 +294,33 @@ func (db *FontDataBase) FindFont(fontDesc *ass.FontDesc, fontSet ass.CodepointSe
 	}
 
 	var bestSource *FontFaceLocation = nil
+	var errValue = math.MaxInt
 	ttfSource, ttfErr := find(ttfExts)
 	otfSource, otfErr := find(otfExts)
 
 	switch {
 	case ttfErr == 0:
 		bestSource = ttfSource
+		errValue = 0
 	case otfErr == 0:
 		bestSource = otfSource
+		errValue = 0
 	case ttfErr <= otfErr:
 		bestSource = ttfSource
+		errValue = ttfErr
 	case otfErr < ttfErr:
 		bestSource = otfSource
+		errValue = otfErr
 	case ttfErr < math.MaxInt:
 		bestSource = ttfSource
+		errValue = ttfErr
 	case otfErr < math.MaxInt:
 		bestSource = otfSource
+		errValue = otfErr
 	}
 
 	if bestSource == nil {
-		return nil, NewErrMissingFontFaceFound(*fontDesc)
+		return nil, 0, NewErrMissingFontFaceFound(*fontDesc)
 	}
-	return bestSource, nil
+	return bestSource, errValue, nil
 }
