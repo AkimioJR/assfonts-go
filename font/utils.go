@@ -3,7 +3,6 @@ package font
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -119,13 +118,10 @@ func abs[T Signed](x T) T {
 
 // 辅助函数：格式化缺失码点
 func formatCodepoints(codepoints []rune) string {
-	s := ""
+	var b strings.Builder
 	for _, cp := range codepoints {
-		s += formatHex(cp) + "  "
+		// b.WriteString("0x" + fmt.Sprintf("%04X", cp) + "  ")
+		b.WriteRune(cp)
 	}
-	return s
-}
-
-func formatHex(cp rune) string {
-	return "0x" + strings.ToUpper(fmt.Sprintf("%04X", cp))
+	return b.String()
 }
