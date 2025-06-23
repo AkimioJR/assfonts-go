@@ -12,9 +12,11 @@ import (
 )
 
 type FontDataBase struct {
-	lib         *FreeTypeLibrary          // FreeType 库实例
-	internalLib bool                      // 是否内部创建 FreeType 库实例
-	data        map[string][]FontFaceInfo // path -> []FontFaceInfo
+	BigMemoryMode bool
+	lib           *FreeTypeLibrary          // FreeType 库实例
+	internalLib   bool                      // 是否内部创建 FreeType 库实例
+	data          map[string][]FontFaceInfo // path -> []FontFaceInfo
+	fontData      map[string][]byte
 }
 
 // 创建一个新的 FontDataBase 对象
@@ -26,6 +28,7 @@ func NewFontDataBase(lib *FreeTypeLibrary) (*FontDataBase, error) {
 		lib:         lib,
 		internalLib: false,
 		data:        make(map[string][]FontFaceInfo),
+		fontData:    make(map[string][]byte),
 	}
 	if lib == nil {
 		lib, err := NewFreeTypeLibrary()
@@ -53,21 +56,28 @@ func (fdb *FontDataBase) Close() error {
 	return nil
 }
 
-func (fdb *FontDataBase) BuildDB(fontsDirs []string, withSystemFontPath bool, ignoreError bool) error {
+func (db *FontDataBase) BuildDB(fontsDirs []string, withSystemFontPath bool, ignoreError bool) error {
 	fontPaths, err := findFontFiles(fontsDirs, withSystemFontPath)
 	if err != nil {
 		return fmt.Errorf("failed to find font files: %w", err)
 	}
 
 	for _, fontPath := range fontPaths {
-		fontFaceInfos, err := fdb.lib.ParseFont(fontPath, ignoreError)
+		fontFaceInfos, err := db.lib.ParseFont(fontPath, ignoreError)
 		if err != nil {
 			if ignoreError {
 				continue
 			}
 			return fmt.Errorf("failed to parse font %s: %w", fontPath, err)
 		}
-		fdb.data[fontPath] = fontFaceInfos
+		if db.BigMemoryMode {
+			data, err := os.ReadFile(fontPath)
+			if err != nil {
+				return fmt.Errorf("failed to read font file %s: %w", fontPath, err)
+			}
+			db.fontData[fontPath] = data
+		}
+		db.data[fontPath] = fontFaceInfos
 	}
 	return nil
 }
@@ -94,8 +104,32 @@ func (db *FontDataBase) LoadDB(dbPath string) error {
 	if err := json.Unmarshal(data, &db.data); err != nil {
 		return fmt.Errorf(`cannot load fonts database: "%s"`, dbPath)
 	}
-
+	if db.BigMemoryMode {
+		for path := range db.data {
+			fontData, err := os.ReadFile(path)
+			if err != nil {
+				return fmt.Errorf(`cannot read font file "%s" for big memory mode: %w`, path, err)
+			}
+			db.fontData[path] = fontData
+		}
+	}
 	return nil
+}
+
+func (db *FontDataBase) getFontData(path string) ([]byte, error) {
+	if db.BigMemoryMode {
+		if data, ok := db.fontData[path]; ok {
+			return data, nil
+		}
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read font file %s: %w", path, err)
+	}
+	if db.BigMemoryMode {
+		db.fontData[path] = data
+	}
+	return data, nil
 }
 
 // 读取 ass.ASSParser 中的所有字形，在 FontDataBase 中查找对应字体的路径，通过 CreatSubfont 子集化后返回子集化后的字体文件
@@ -167,7 +201,7 @@ func (db *FontDataBase) SubsetConcurrent(ap *ass.ASSParser) (map[string][]byte, 
 }
 
 func (db *FontDataBase) subset(sfi *SubsetFontInfo) (string, []byte, error) {
-	subFontData, err := CreatSubfont(sfi)
+	subFontData, err := db.CreatSubfont(sfi)
 	if err != nil {
 		return "", nil, err
 	}

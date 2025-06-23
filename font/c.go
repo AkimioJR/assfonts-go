@@ -360,11 +360,11 @@ func (db *FontDataBase) CheckGlyph(ffl *FontFaceLocation, fontSet ass.CodepointS
 	return nil
 }
 
-func CreatSubfont(subsetFontInfo *SubsetFontInfo) ([]byte, error) {
+func (db *FontDataBase) CreatSubfont(subsetFontInfo *SubsetFontInfo) ([]byte, error) {
 	if subsetFontInfo == nil {
 		return nil, fmt.Errorf("subsetInfo is nil")
 	}
-	fontData, err := os.ReadFile(subsetFontInfo.Source.Path)
+	fontData, err := db.getFontData(subsetFontInfo.Source.Path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read font file %s: %w", subsetFontInfo.Source.Path, err)
 	}
