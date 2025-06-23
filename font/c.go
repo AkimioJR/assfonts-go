@@ -2,20 +2,27 @@ package font
 
 /*
 #cgo CFLAGS: -I${SRCDIR}/clib/arm64-osx/include
-#cgo LDFLAGS: -L${SRCDIR}/clib/arm64-osx/lib -lfreetype -lbz2 -lbrotlidec -lbrotlicommon -lbrotlienc -lz -lpng16
+#cgo LDFLAGS: -L${SRCDIR}/clib/arm64-osx/lib -lfreetype -lharfbuzz -lharfbuzz-subset -lbz2 -lbrotlidec -lbrotlicommon -lbrotlienc -lz -lpng16
 
+// freetype
 #include <ft2build.h>
 #include FT_FREETYPE_H // <freetype/freetype.h>
 #include FT_TYPE1_TABLES_H // <freetype/t1tables.h>
 #include FT_SFNT_NAMES_H // <freetype/ttnameid.h>
 #include FT_TRUETYPE_TABLES_H // <freetype/tttables.h>
 #include FT_SFNT_NAMES_H // <freetype/ftsnames.h>
+
+// harfbuzz
+#define HB_EXPERIMENTAL_API
+#include <harfbuzz/hb-subset.h>
 */
 import "C"
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
+	"github/Akimio521/assfonts-go/ass"
 	"os"
 	"strings"
 	"unsafe"
@@ -53,7 +60,7 @@ func (lib *FreeTypeLibrary) Close() error {
 }
 
 // 解析字体文件
-func (lib *FreeTypeLibrary) ParseFont(fontPath string, ignoreError bool) ([]FontInfo, error) {
+func (lib *FreeTypeLibrary) ParseFont(fontPath string, ignoreError bool) ([]FontFaceInfo, error) {
 	fileInfo, err := os.Stat(fontPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to stat font file %s: %w", fontPath, err)
@@ -76,8 +83,8 @@ func (lib *FreeTypeLibrary) ParseFont(fontPath string, ignoreError bool) ([]Font
 		C.FT_Done_Face(metaFace) // 释放元字体对象
 	}
 
-	facesNum := int64(metaFace.num_faces)      // 获取字体文件中的字体数量
-	fontInfos := make([]FontInfo, 0, facesNum) // 初始化字体信息切片
+	facesNum := int64(metaFace.num_faces)              // 获取字体文件中的字体数量
+	fontFaceInfos := make([]FontFaceInfo, 0, facesNum) // 初始化字体信息切片
 	for idx := 0; idx < int(facesNum); idx++ {
 		var face C.FT_Face = nil
 		errCode = C.FT_New_Memory_Face(lib.ptr, (*C.FT_Byte)(cFontData), C.FT_Long(len(fontData)), C.FT_Long(idx), &face)
@@ -90,29 +97,31 @@ func (lib *FreeTypeLibrary) ParseFont(fontPath string, ignoreError bool) ([]Font
 			defer C.FT_Done_Face(face)
 		}
 
-		fontInfo, err := lib.parseFace(face)
+		fontFaceInfo, err := lib.parseFace(face)
 		if err != nil {
 			if ignoreError {
 				continue // 如果忽略错误，跳过当前字体
 			}
 			return nil, fmt.Errorf("error parsing face at index %d: %w", idx, err)
 		}
-		if fontInfo != nil {
-			fontInfo.Index = uint(idx)                  // 设置字体索引
-			fontInfo.LastWriteTime = fileInfo.ModTime() // 设置最后写入时间
-			fontInfo.Path = fontPath                    // 设置字体文件路径
-			fontInfos = append(fontInfos, *fontInfo)    // 添加到字体信息切片
+		if fontFaceInfo != nil {
+			fontFaceInfo.Source = FontFaceLocation{ // 设置字体来源为文件
+				Path:  fontPath,  // 设置字体文件路径
+				Index: uint(idx), // 设置字体索引
+			}
+			fontFaceInfo.Modified = fileInfo.ModTime()           // 设置最后写入时间
+			fontFaceInfos = append(fontFaceInfos, *fontFaceInfo) // 添加到字体信息切片
 		}
 
 	}
 
-	if len(fontInfos) == 0 {
+	if len(fontFaceInfos) == 0 {
 		return nil, ErrNoValidFontFace
 	}
-	return fontInfos, nil
+	return fontFaceInfos, nil
 }
 
-func (lib *FreeTypeLibrary) parseFace(face C.FT_Face) (*FontInfo, error) {
+func (lib *FreeTypeLibrary) parseFace(face C.FT_Face) (*FontFaceInfo, error) {
 	var (
 		families  []string = make([]string, 0) // 字体家族
 		fullnames []string = make([]string, 0) // 字体全名
@@ -161,14 +170,14 @@ func (lib *FreeTypeLibrary) parseFace(face C.FT_Face) (*FontInfo, error) {
 	// 	fmt.Printf("Fullnames: %v\n", fullnames)
 	// 	fmt.Printf("PS Names: %v\n", psnames)
 
-	fontInfo := FontInfo{
+	fontFaceInfo := FontFaceInfo{
 		Families:  families,
-		Fullnames: fullnames,
+		FullNames: fullnames,
 		PSNames:   psnames,
 		Weight:    getAssFaceWeight(face), // 字重
 		Slant:     getAssFaceSlant(face),  // 0或110，斜体角度
 	}
-	return &fontInfo, nil
+	return &fontFaceInfo, nil
 }
 
 // 解析字体名称
@@ -317,4 +326,90 @@ func getAssFaceSlant(face C.FT_Face) uint {
 		slant = 0 // 如果斜体角度不在0-110范围内，设置为默认值0
 	}
 	return uint(slant)
+}
+
+func (db *FontDataBase) CheckGlyph(ffl *FontFaceLocation, fontSet ass.CodepointSet, fontDesc *ass.FontDesc) error {
+	var missingCodepoints []rune
+	var face C.FT_Face
+	fontData, err := os.ReadFile(ffl.Path)
+	if err != nil {
+		return err
+	}
+	cFontData := C.CBytes(fontData)
+	defer C.free(cFontData)
+
+	errCode := C.FT_New_Memory_Face(db.lib.ptr, (*C.FT_Byte)(cFontData), C.FT_Long(len(fontData)), C.FT_Long(ffl.Index), &face)
+	if errCode != 0 {
+		return fmt.Errorf("parse font error, error code: %d", int(errCode))
+	}
+	defer C.FT_Done_Face(face) // 释放元字体对象
+
+	for codepoint := range fontSet {
+		if codepoint == 0 {
+			continue
+		}
+		if C.FT_Get_Char_Index(face, C.FT_ULong(codepoint)) != 0 { // 未找到对应的字形
+			missingCodepoints = append(missingCodepoints, codepoint)
+		}
+	}
+	if len(missingCodepoints) > 0 {
+		return NewErrMissCodepoints(fontDesc, missingCodepoints)
+	}
+	return nil
+}
+
+func CreatSubfont(subsetFontInfo *SubsetFontInfo) ([]byte, error) {
+	if subsetFontInfo == nil {
+		return nil, fmt.Errorf("subsetInfo is nil")
+	}
+	fontData, err := os.ReadFile(subsetFontInfo.Source.Path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read font file %s: %w", subsetFontInfo.Source.Path, err)
+	}
+	cFontData := C.CBytes(fontData)
+	defer C.free(cFontData)
+
+	// 创建 HarfBuzz blob
+	blob := C.hb_blob_create((*C.char)(cFontData), C.uint(len(fontData)), C.HB_MEMORY_MODE_WRITABLE, nil, nil)
+	defer C.hb_blob_destroy(blob)
+
+	// 创建 HarfBuzz face
+	face := C.hb_face_create(blob, 0)
+	defer C.hb_face_destroy(face)
+
+	// 创建 codepoint set
+	cpSet := C.hb_set_create()
+	defer C.hb_set_destroy(cpSet)
+	for cp := range subsetFontInfo.Codepoints {
+		C.hb_set_add(cpSet, C.uint(cp))
+	}
+
+	// 创建 subset input
+	input := C.hb_subset_input_create_or_fail()
+	if input == nil {
+		return nil, errors.New("hb subset input create failed")
+	}
+	defer C.hb_subset_input_destroy(input)
+	inputCodepoints := C.hb_subset_input_set(input, C.HB_SUBSET_SETS_UNICODE)
+	C.hb_set_union(inputCodepoints, cpSet)
+
+	// 子集化
+	subsetFace := C.hb_subset_or_fail(face, input)
+	if subsetFace == nil {
+		return nil, errors.New("hb_subset_or_fail failed")
+	}
+	defer C.hb_face_destroy(subsetFace)
+
+	// 获取子集数据
+	subsetBlob := C.hb_face_reference_blob(subsetFace)
+	defer C.hb_blob_destroy(subsetBlob)
+	var length C.uint
+	subsetData := C.hb_blob_get_data(subsetBlob, &length)
+	if subsetData == nil || length == 0 {
+		return nil, errors.New("hb_blob_get_data failed")
+	}
+
+	// 将C字节数组转换为Go字节切片
+	goData := C.GoBytes(unsafe.Pointer(subsetData), C.int(length))
+	return goData, nil
 }

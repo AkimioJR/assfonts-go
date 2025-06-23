@@ -3,6 +3,7 @@ package font
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -103,4 +104,28 @@ func findFontFiles(fontsDirs []string, withSystemFontPath bool) ([]string, error
 		return nil, errors.New("no font files found")
 	}
 	return fontsPath, nil
+}
+
+type Signed interface {
+	~int | ~int8 | ~int16 | ~int32 | ~int64
+}
+
+func abs[T Signed](x T) T {
+	if x < 0 {
+		return -x
+	}
+	return x
+}
+
+// 辅助函数：格式化缺失码点
+func formatCodepoints(codepoints []rune) string {
+	s := ""
+	for _, cp := range codepoints {
+		s += formatHex(cp) + "  "
+	}
+	return s
+}
+
+func formatHex(cp rune) string {
+	return "0x" + strings.ToUpper(fmt.Sprintf("%04X", cp))
 }
