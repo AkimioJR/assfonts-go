@@ -137,7 +137,7 @@ func (db *FontDataBase) getFontData(path string) ([]byte, error) {
 
 // 读取 ass.ASSParser 中的所有字形，在 FontDataBase 中查找对应字体的路径，通过 CreatSubfont 子集化后返回子集化后的字体文件
 func (db *FontDataBase) Subset(ap *ass.ASSParser, fn func(error) bool, checkGlyph bool) (map[string][]byte, error) {
-	subsetFontInfos, err := db.parseSubsetFontInfos(ap)
+	subsetFontInfos, err := db.parseSubsetFontInfos(ap, fn)
 	if err != nil {
 		return nil, fmt.Errorf("parse sub set info failed: %w", err)
 	}
@@ -158,7 +158,7 @@ func (db *FontDataBase) Subset(ap *ass.ASSParser, fn func(error) bool, checkGlyp
 }
 
 func (db *FontDataBase) SubsetConcurrent(ap *ass.ASSParser, fn func(error) bool, checkGlyph bool) (map[string][]byte, error) {
-	subsetFontInfos, err := db.parseSubsetFontInfos(ap)
+	subsetFontInfos, err := db.parseSubsetFontInfos(ap, fn)
 	if err != nil {
 		return nil, fmt.Errorf("parse sub set info failed: %w", err)
 	}
@@ -221,7 +221,7 @@ func (db *FontDataBase) subset(sfi *SubsetFontInfo, fn func(error) bool, checkGl
 	return sfi.FontsDesc.FontName + filepath.Ext(sfi.Source.Path), subFontData, nil
 }
 
-func (db *FontDataBase) parseSubsetFontInfos(ap *ass.ASSParser) ([]SubsetFontInfo, error) {
+func (db *FontDataBase) parseSubsetFontInfos(ap *ass.ASSParser, fn func(error) bool) ([]SubsetFontInfo, error) {
 	subsetFontInfos := make([]SubsetFontInfo, 0, len(ap.FontSets))
 
 	for fontDesc, fontSet := range ap.FontSets {
@@ -231,10 +231,9 @@ func (db *FontDataBase) parseSubsetFontInfos(ap *ass.ASSParser) ([]SubsetFontInf
 		if err != nil {
 			return nil, fmt.Errorf(`missing the font face "%s" (%d,%d): %w`, fontDesc.FontName, fontDesc.Bold, fontDesc.Italic, err)
 		}
-		// err = fs.CheckGlyph(db.lib, fontPath, fontSet, strings.ToLower(fontDesc.FontName), fontDesc.Bold, fontDesc.Italic)
-		// if err != nil {
-		// 	return fmt.Errorf(`check font face "%s" (%d,%d) of %s error: %w`, fontDesc.FontName, fontDesc.Bold, fontDesc.Italic, fontPath.Path, err)
-		// }
+		if fn != nil {
+			fn(NewInfoMsg(`"%s" (%d,%d) ---> "%s"[%d]`, fontDesc.FontName, fontDesc.Bold, fontDesc.Italic, fontPath.Path, fontPath.Index))
+		}
 
 		for wch := range fontSet {
 			codepointSet[wch] = struct{}{}

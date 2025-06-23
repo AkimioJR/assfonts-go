@@ -106,5 +106,17 @@ func (w WarningMsg) Error() string {
 	return string(w)
 }
 
+type InfoMsg string
+
+func NewInfoMsg(format string, a ...any) *InfoMsg {
+	w := InfoMsg(fmt.Sprintf(format, a...))
+	return &w
+}
+
+func (i InfoMsg) Error() string {
+	return string(i)
+}
+
 var _ error = (*ErrUnSupportEncode)(nil)
 var _ error = (*WarningMsg)(nil)
+var _ error = (*InfoMsg)(nil)
