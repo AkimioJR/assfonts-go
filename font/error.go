@@ -30,22 +30,22 @@ func (e *ErrUnsupportedPlatform) Error() string {
 	return fmt.Sprintf("skipping name with platform ID %d", e.platformID)
 }
 
-type ErrCreateFontFace struct {
+type ErrOpenFontFace struct {
 	path    string
 	idx     uint
 	errCode int
 }
 
-func NewErrCreateFontFace(p string, i uint, c int) *ErrCreateFontFace {
-	return &ErrCreateFontFace{
+func NewErrOpenFontFace(p string, i uint, c int) *ErrOpenFontFace {
+	return &ErrOpenFontFace{
 		path:    p,
 		idx:     i,
 		errCode: c,
 	}
 }
 
-func (e *ErrCreateFontFace) Error() string {
-	return fmt.Sprintf("failed to create font face: %s [index: %d, code: %d]", e.path, e.idx, e.errCode)
+func (e *ErrOpenFontFace) Error() string {
+	return fmt.Sprintf("failed to create font face: \"%s\"[%d], error code: %d]", e.path, e.idx, e.errCode)
 }
 
 type ErrGetSFNTName struct {

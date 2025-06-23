@@ -58,6 +58,15 @@ func (lib *FreeTypeLibrary) Close() error {
 	return nil
 }
 
+func openFTFace(lib *FreeTypeLibrary, fontPath string, data *C.FT_Byte, size C.FT_Long, faceIdx C.FT_Long) (C.FT_Face, error) {
+	var face C.FT_Face
+	errCode := C.FT_New_Memory_Face(lib.ptr, data, size, faceIdx, &face)
+	if errCode != 0 {
+		return nil, NewErrOpenFontFace(fontPath, uint(faceIdx), int(errCode))
+	}
+	return face, nil
+}
+
 // 解析字体文件
 func (lib *FreeTypeLibrary) ParseFont(fontPath string, fn func(error) bool) ([]FontFaceInfo, error) {
 	fileInfo, err := os.Stat(fontPath)
@@ -72,23 +81,15 @@ func (lib *FreeTypeLibrary) ParseFont(fontPath string, fn func(error) bool) ([]F
 	cFontData := C.CBytes(fontData) // 将Go字节切片转换为C字节数组
 	defer C.free(cFontData)         // 确保在函数结束时释放C字节数组
 
-	var metaFace C.FT_Face
-
-	// 调用C函数解析字体
-	errCode := C.FT_New_Memory_Face(lib.ptr, (*C.FT_Byte)(cFontData), C.FT_Long(len(fontData)), 0, &metaFace) // 0表示加载第一个字体
-	if errCode != 0 {
-		return nil, fmt.Errorf("parse font error, error code: %d", int(errCode))
+	metaFace, err := openFTFace(lib, fontPath, (*C.FT_Byte)(cFontData), C.FT_Long(len(fontData)), 0)
+	if err != nil {
+		return nil, err
 	}
 	facesNum := int64(metaFace.num_faces) // 获取字体文件中的字体数量
 	C.FT_Done_Face(metaFace)
 	fontFaceInfos := make([]FontFaceInfo, 0, facesNum) // 初始化字体信息切片
 	for idx := 0; idx < int(facesNum); idx++ {
-		var face C.FT_Face = nil
-		var err error = nil
-		errCode = C.FT_New_Memory_Face(lib.ptr, (*C.FT_Byte)(cFontData), C.FT_Long(len(fontData)), C.FT_Long(idx), &face)
-		if errCode != 0 {
-			err = NewErrCreateFontFace(fontPath, uint(idx), int(errCode))
-		}
+		face, err := openFTFace(lib, fontPath, (*C.FT_Byte)(cFontData), C.FT_Long(len(fontData)), C.FT_Long(idx))
 		if err != nil {
 			if fn == nil || !fn(err) {
 				return nil, err
