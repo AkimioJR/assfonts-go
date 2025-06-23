@@ -56,24 +56,27 @@ func (fdb *FontDataBase) Close() error {
 	return nil
 }
 
-func (db *FontDataBase) BuildDB(fontsDirs []string, withSystemFontPath bool, ignoreError bool) error {
+func (db *FontDataBase) BuildDB(fontsDirs []string, withSystemFontPath bool, fn func(error) bool) error {
 	fontPaths, err := findFontFiles(fontsDirs, withSystemFontPath)
 	if err != nil {
 		return fmt.Errorf("failed to find font files: %w", err)
 	}
 
 	for _, fontPath := range fontPaths {
-		fontFaceInfos, err := db.lib.ParseFont(fontPath, ignoreError)
+		fontFaceInfos, err := db.lib.ParseFont(fontPath, fn)
 		if err != nil {
-			if ignoreError {
-				continue
+			if fn != nil { // 仅提示错误，不终止程序
+				fn(NewWarningMsg("failed to parse font %s: %s", fontPath, err))
 			}
-			return fmt.Errorf("failed to parse font %s: %w", fontPath, err)
+			continue
 		}
 		if db.BigMemoryMode {
 			data, err := os.ReadFile(fontPath)
 			if err != nil {
-				return fmt.Errorf("failed to read font file %s: %w", fontPath, err)
+				if fn != nil { // 仅提示错误，不终止程序
+					fn(NewWarningMsg("failed to read font file %s: %s", fontPath, err))
+				}
+				continue
 			}
 			db.fontData[fontPath] = data
 		}

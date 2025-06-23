@@ -17,7 +17,6 @@ package font
 #include <harfbuzz/hb-subset.h>
 */
 import "C"
-
 import (
 	"bytes"
 	"errors"
@@ -60,7 +59,7 @@ func (lib *FreeTypeLibrary) Close() error {
 }
 
 // 解析字体文件
-func (lib *FreeTypeLibrary) ParseFont(fontPath string, ignoreError bool) ([]FontFaceInfo, error) {
+func (lib *FreeTypeLibrary) ParseFont(fontPath string, fn func(error) bool) ([]FontFaceInfo, error) {
 	fileInfo, err := os.Stat(fontPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to stat font file %s: %w", fontPath, err)
@@ -80,26 +79,29 @@ func (lib *FreeTypeLibrary) ParseFont(fontPath string, ignoreError bool) ([]Font
 	if errCode != 0 {
 		return nil, fmt.Errorf("parse font error, error code: %d", int(errCode))
 	}
-	defer C.FT_Done_Face(metaFace)
-
-	facesNum := int64(metaFace.num_faces)              // 获取字体文件中的字体数量
+	facesNum := int64(metaFace.num_faces) // 获取字体文件中的字体数量
+	C.FT_Done_Face(metaFace)
 	fontFaceInfos := make([]FontFaceInfo, 0, facesNum) // 初始化字体信息切片
 	for idx := 0; idx < int(facesNum); idx++ {
 		var face C.FT_Face = nil
+		var err error = nil
 		errCode = C.FT_New_Memory_Face(lib.ptr, (*C.FT_Byte)(cFontData), C.FT_Long(len(fontData)), C.FT_Long(idx), &face)
 		if errCode != 0 {
-			if ignoreError {
-				continue // 如果忽略错误，跳过当前字体
-			}
-			return nil, fmt.Errorf("error creating face for font %s at index %d with error code %d", fontPath, idx, int(errCode))
+			err = NewErrCreateFontFace(fontPath, uint(idx), int(errCode))
 		}
-		fontFaceInfo, err := lib.parseFace(face)
+		if err != nil {
+			if fn == nil || !fn(err) {
+				return nil, err
+			}
+			continue
+		}
+		fontFaceInfo, err := lib.parseFace(face, fn)
 		C.FT_Done_Face(face)
 		if err != nil {
-			if ignoreError {
-				continue // 如果忽略错误，跳过当前字体
+			if fn == nil || !fn(err) {
+				return nil, err
 			}
-			return nil, fmt.Errorf("error parsing face at index %d: %w", idx, err)
+			continue
 		}
 		if fontFaceInfo != nil {
 			fontFaceInfo.Source = FontFaceLocation{ // 设置字体来源为文件
@@ -118,7 +120,7 @@ func (lib *FreeTypeLibrary) ParseFont(fontPath string, ignoreError bool) ([]Font
 	return fontFaceInfos, nil
 }
 
-func (lib *FreeTypeLibrary) parseFace(face C.FT_Face) (*FontFaceInfo, error) {
+func (lib *FreeTypeLibrary) parseFace(face C.FT_Face, fn func(error) bool) (*FontFaceInfo, error) {
 	var (
 		families  []string = make([]string, 0) // 字体家族
 		fullnames []string = make([]string, 0) // 字体全名
@@ -146,16 +148,10 @@ func (lib *FreeTypeLibrary) parseFace(face C.FT_Face) (*FontFaceInfo, error) {
 
 	// 	fmt.Println("No PS Glyph Names found in the font.")
 	namesNum := int(C.FT_Get_Sfnt_Name_Count(face)) // 获取字体名称数量
-	for i := 0; i < namesNum; i++ {
-		if err := parseFontName(face, C.uint(i), &families, &fullnames, &psnames); err != nil {
-			if _, ok := err.(*ErrUnsupportedID); ok {
-				// fmt.Println(err)
-				continue // 跳过不支持的名称ID
-			} else if _, ok := err.(*ErrUnsupportedPlatform); ok {
-				// fmt.Println(err)
-				continue // 跳过不支持的平台ID
-			}
-			return nil, fmt.Errorf("error parsing font name at index %d: %w", i, err)
+	for i := range namesNum {
+		err := parseSfntName(face, C.uint(i), &families, &fullnames, &psnames)
+		if err != nil && fn != nil {
+			fn(err)
 		}
 	}
 
@@ -177,16 +173,20 @@ func (lib *FreeTypeLibrary) parseFace(face C.FT_Face) (*FontFaceInfo, error) {
 	return &fontFaceInfo, nil
 }
 
-// 解析字体名称
-func parseFontName(
-	ftFace C.FT_Face,
-	nameIdx C.uint,
-	families, fullnames, psnames *[]string,
-) error {
-	var name C.FT_SfntName
+func ftGetSfntName(ftFace C.FT_Face, nameIdx C.uint, name *C.FT_SfntName) error {
+	c := C.FT_Get_Sfnt_Name(ftFace, nameIdx, name)
+	if c != 0 {
+		return NewErrGetSFNTName(uint(ftFace.face_index), uint(nameIdx), int(c))
+	}
+	return nil
+}
 
-	if C.FT_Get_Sfnt_Name(ftFace, nameIdx, &name) != 0 {
-		return fmt.Errorf("error getting name for index %d", nameIdx)
+// 解析Sfnt名称
+func parseSfntName(ftFace C.FT_Face, nameIdx C.uint, families, fullnames, psnames *[]string) error {
+	var name C.FT_SfntName
+	err := ftGetSfntName(ftFace, nameIdx, &name) // 获取字体名称
+	if err != nil {
+		return err
 	}
 	// fmt.Println(name)
 

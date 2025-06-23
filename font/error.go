@@ -28,6 +28,42 @@ func (e *ErrUnsupportedPlatform) Error() string {
 	return fmt.Sprintf("skipping name with platform ID %d", e.platformID)
 }
 
+type ErrCreateFontFace struct {
+	path    string
+	idx     uint
+	errCode int
+}
+
+func NewErrCreateFontFace(p string, i uint, c int) *ErrCreateFontFace {
+	return &ErrCreateFontFace{
+		path:    p,
+		idx:     i,
+		errCode: c,
+	}
+}
+
+func (e *ErrCreateFontFace) Error() string {
+	return fmt.Sprintf("failed to create font face: %s [index: %d, code: %d]", e.path, e.idx, e.errCode)
+}
+
+type ErrGetSFNTName struct {
+	faceIdx uint
+	nameIdx uint
+	c       int
+}
+
+func NewErrGetSFNTName(faceIdx uint, nameIdx uint, c int) *ErrGetSFNTName {
+	return &ErrGetSFNTName{
+		faceIdx: faceIdx,
+		nameIdx: nameIdx,
+		c:       c,
+	}
+}
+
+func (e *ErrGetSFNTName) Error() string {
+	return fmt.Sprintf("failed to get SFNT name for face#%d name#%d: code %d", e.faceIdx, e.nameIdx, e.c)
+}
+
 type ErrMissCodepoints struct {
 	fontDesc          ass.FontDesc
 	missingCodepoints []rune
@@ -43,3 +79,16 @@ func NewErrMissCodepoints(fontDesc *ass.FontDesc, missingCodepoints []rune) *Err
 		missingCodepoints: missingCodepoints,
 	}
 }
+
+type WarningMsg string
+
+func NewWarningMsg(format string, a ...any) *WarningMsg {
+	w := WarningMsg(fmt.Sprintf(format, a...))
+	return &w
+}
+
+func (w WarningMsg) Error() string {
+	return string(w)
+}
+
+var _ error = (*WarningMsg)(nil)
