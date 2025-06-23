@@ -251,40 +251,39 @@ func (db *FontDataBase) parseSubsetFontInfos(ap *ass.ASSParser, fn func(error) b
 }
 
 var (
-	ttfExts = map[string]struct{}{".ttf": {}, ".ttc": {}}
-	otfExts = map[string]struct{}{".otf": {}, ".otc": {}}
+	ttfExts = []string{".ttf", ".ttc"}
+	otfExts = []string{".otf", ".otc"}
 )
 
 func (db *FontDataBase) FindFont(fontDesc *ass.FontDesc, fontSet ass.CodepointSet) (*FontFaceLocation, error) {
-	fontname := strings.ToLower(fontDesc.FontName)
+	targetName := strings.ToLower(fontDesc.FontName)
 
-	find := func(acceptExts map[string]struct{}) (*FontFaceLocation, int) {
+	find := func(acceptExts []string) (*FontFaceLocation, int) {
 		minErr := math.MaxInt // 当前最小误差
 		var best = &FontFaceLocation{}
 
 		for path, fontFaceInfos := range db.data {
-			if minErr == 0 {
-				break
-			}
-
-			ext := strings.ToLower(filepath.Ext(path))
-			if _, ok := acceptExts[ext]; !ok {
+			if !contains(acceptExts, strings.ToLower(filepath.Ext(path))) {
 				continue
 			}
 			for _, fontFaceInfo := range fontFaceInfos {
-				var currentErr int // 当前误差
-				if contains(fontFaceInfo.Families, fontname) {
-					currentErr = abs(int(fontDesc.Bold)-int(fontFaceInfo.Weight)) + abs(int(fontDesc.Italic)-int(fontFaceInfo.Slant))
-					// fmt.Println("find", fontname, "in", fontInfo.Families, "with score: ", score, "path: ", path)
-				} else if contains(fontFaceInfo.FullNames, fontname) || contains(fontFaceInfo.PSNames, fontname) {
+				var currentErr int = math.MaxInt // 当前误差
+				found := false
+
+				if contains(fontFaceInfo.FullNames, targetName) || contains(fontFaceInfo.PSNames, targetName) { // 精确匹配，全名一致
+					found = true
 					currentErr = 0
-				} else {
+				} else if contains(fontFaceInfo.Families, targetName) { // 检查家族名
+					currentErr = abs(int(fontDesc.Bold)-int(fontFaceInfo.Weight)) + abs(int(fontDesc.Italic)-int(fontFaceInfo.Slant))
+					found = true
+				}
+
+				if !found {
 					continue
 				}
 				if currentErr < minErr {
 					minErr = currentErr
-					best.Path = path
-					best.Index = fontFaceInfo.Source.Index
+					best = &fontFaceInfo.Source
 				}
 				if currentErr == 0 {
 					break
@@ -294,22 +293,27 @@ func (db *FontDataBase) FindFont(fontDesc *ass.FontDesc, fontSet ass.CodepointSe
 		return best, minErr
 	}
 
-	var bestSource *FontFaceLocation
+	var bestSource *FontFaceLocation = nil
 	ttfSource, ttfErr := find(ttfExts)
-	otcSource, otcErr := find(otfExts)
+	otfSource, otfErr := find(otfExts)
 
-	// 优先 ttf/ttc
-	if ttfErr < math.MaxInt || otcErr < math.MaxInt {
-		if ttfErr <= otcErr {
-			bestSource = ttfSource
-		} else {
-			bestSource = otcSource
-		}
+	switch {
+	case ttfErr == 0:
+		bestSource = ttfSource
+	case otfErr == 0:
+		bestSource = otfSource
+	case ttfErr <= otfErr:
+		bestSource = ttfSource
+	case otfErr < ttfErr:
+		bestSource = otfSource
+	case ttfErr < math.MaxInt:
+		bestSource = ttfSource
+	case otfErr < math.MaxInt:
+		bestSource = otfSource
 	}
 
 	if bestSource == nil {
 		return nil, fmt.Errorf("no valid font found for %s", fontDesc.FontName)
 	}
-	// fmt.Printf("find font \"%s\" (%d,%d) ---> \"%s\"[%d]\n", fontDesc.FontName, fontDesc.Bold, fontDesc.Italic, bestPath.Path, bestPath.Index)
 	return bestSource, nil
 }
