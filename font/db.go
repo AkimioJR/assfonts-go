@@ -229,7 +229,7 @@ func (db *FontDataBase) parseSubsetFontInfos(ap *ass.ASSParser, fn func(error) b
 		codepointSet := make(ass.CodepointSet)
 		fontPath, err := db.FindFont(&fontDesc, fontSet)
 		if err != nil {
-			return nil, fmt.Errorf(`missing the font face "%s" (%d,%d): %w`, fontDesc.FontName, fontDesc.Bold, fontDesc.Italic, err)
+			return nil, err
 		}
 		if fn != nil {
 			fn(NewInfoMsg(`"%s" (%d,%d) ---> "%s"[%d]`, fontDesc.FontName, fontDesc.Bold, fontDesc.Italic, fontPath.Path, fontPath.Index))
@@ -255,7 +255,7 @@ var (
 	otfExts = []string{".otf", ".otc"}
 )
 
-func (db *FontDataBase) FindFont(fontDesc *ass.FontDesc, fontSet ass.CodepointSet) (*FontFaceLocation, error) {
+func (db *FontDataBase) FindFont(fontDesc *ass.FontDesc, fontSet ass.CodepointSet) (*FontFaceLocation, *ErrMissingFontFaceFound) {
 	targetName := strings.ToLower(fontDesc.FontName)
 
 	find := func(acceptExts []string) (*FontFaceLocation, int) {
@@ -313,7 +313,7 @@ func (db *FontDataBase) FindFont(fontDesc *ass.FontDesc, fontSet ass.CodepointSe
 	}
 
 	if bestSource == nil {
-		return nil, fmt.Errorf("no valid font found for %s", fontDesc.FontName)
+		return nil, NewErrMissingFontFaceFound(*fontDesc)
 	}
 	return bestSource, nil
 }

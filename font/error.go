@@ -95,6 +95,17 @@ func (e ErrUnSupportEncode) Error() string {
 	return fmt.Sprintf(`unsupport encoding type: "%s"`, string(e))
 }
 
+type ErrMissingFontFaceFound ass.FontDesc
+
+func NewErrMissingFontFaceFound(f ass.FontDesc) *ErrMissingFontFaceFound {
+	e := ErrMissingFontFaceFound(f)
+	return &e
+}
+
+func (e *ErrMissingFontFaceFound) Error() string {
+	return fmt.Sprintf(`missing font face found for "%s" (%d,%d)`, e.FontName, e.Bold, e.Italic)
+}
+
 type WarningMsg string
 
 func NewWarningMsg(format string, a ...any) *WarningMsg {
