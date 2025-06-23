@@ -136,7 +136,7 @@ func (db *FontDataBase) getFontData(path string) ([]byte, error) {
 }
 
 // 读取 ass.ASSParser 中的所有字形，在 FontDataBase 中查找对应字体的路径，通过 CreatSubfont 子集化后返回子集化后的字体文件
-func (db *FontDataBase) Subset(ap *ass.ASSParser) (map[string][]byte, error) {
+func (db *FontDataBase) Subset(ap *ass.ASSParser, fn func(error) bool, checkGlyph bool) (map[string][]byte, error) {
 	subsetFontInfos, err := db.parseSubsetFontInfos(ap)
 	if err != nil {
 		return nil, fmt.Errorf("parse sub set info failed: %w", err)
@@ -145,16 +145,19 @@ func (db *FontDataBase) Subset(ap *ass.ASSParser) (map[string][]byte, error) {
 	subFontDatas := make(map[string][]byte)
 
 	for _, sfi := range subsetFontInfos {
-		key, subFontData, err := db.subset(&sfi)
+		key, subFontData, err := db.subset(&sfi, fn, checkGlyph)
 		if err != nil {
-			return nil, err
+			if fn != nil && !fn(err) {
+				return nil, err
+			}
+			continue
 		}
 		subFontDatas[key] = subFontData
 	}
 	return subFontDatas, nil
 }
 
-func (db *FontDataBase) SubsetConcurrent(ap *ass.ASSParser) (map[string][]byte, error) {
+func (db *FontDataBase) SubsetConcurrent(ap *ass.ASSParser, fn func(error) bool, checkGlyph bool) (map[string][]byte, error) {
 	subsetFontInfos, err := db.parseSubsetFontInfos(ap)
 	if err != nil {
 		return nil, fmt.Errorf("parse sub set info failed: %w", err)
@@ -166,16 +169,15 @@ func (db *FontDataBase) SubsetConcurrent(ap *ass.ASSParser) (map[string][]byte, 
 	}
 
 	results := make(chan result, len(subsetFontInfos))
-	errChan := make(chan error, 1) // 只需缓冲1个错误
 
 	var wg sync.WaitGroup
 	wg.Add(len(subsetFontInfos))
 	for _, sfi := range subsetFontInfos {
 		go func() {
 			defer wg.Done()
-			key, subFontData, err := db.subset(&sfi)
-			if err != nil {
-				errChan <- err
+			key, subFontData, err := db.subset(&sfi, fn, checkGlyph)
+			if err != nil && fn != nil {
+				fn(err)
 				return
 			}
 			results <- result{key, subFontData}
@@ -193,18 +195,26 @@ func (db *FontDataBase) SubsetConcurrent(ap *ass.ASSParser) (map[string][]byte, 
 	for r := range results {
 		subFontDatas[r.key] = r.data
 	}
-
-	// 检查是否有错误发生
-	select {
-	case err := <-errChan:
-		return nil, err
-	default:
-		return subFontDatas, nil
+	if len(subFontDatas) == 0 {
+		return nil, ErrEmptySubsetData
 	}
+	return subFontDatas, nil
 }
 
-func (db *FontDataBase) subset(sfi *SubsetFontInfo) (string, []byte, error) {
-	subFontData, err := db.CreatSubfont(sfi)
+func (db *FontDataBase) subset(sfi *SubsetFontInfo, fn func(error) bool, checkGlyph bool) (string, []byte, error) {
+	fontData, err := db.getFontData(sfi.Source.Path)
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to get font data for %s: %w", sfi.Source.Path, err)
+	}
+	if fn != nil && checkGlyph {
+		go func() {
+			err := db.CheckGlyph(fontData, &sfi.Source, sfi.Codepoints, &sfi.FontsDesc)
+			if err != nil {
+				fn(err)
+			}
+		}()
+	}
+	subFontData, err := db.CreatSubfont(sfi, fontData)
 	if err != nil {
 		return "", nil, err
 	}

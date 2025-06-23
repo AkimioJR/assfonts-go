@@ -327,17 +327,14 @@ func getAssFaceSlant(face C.FT_Face) uint {
 	return uint(slant)
 }
 
-func (db *FontDataBase) CheckGlyph(ffl *FontFaceLocation, fontSet ass.CodepointSet, fontDesc *ass.FontDesc) error {
+func (db *FontDataBase) CheckGlyph(fontData []byte, source *FontFaceLocation, fontSet ass.CodepointSet, fontDesc *ass.FontDesc) error {
 	var missingCodepoints []rune
 	var face C.FT_Face
-	fontData, err := os.ReadFile(ffl.Path)
-	if err != nil {
-		return err
-	}
+
 	cFontData := C.CBytes(fontData)
 	defer C.free(cFontData)
 
-	errCode := C.FT_New_Memory_Face(db.lib.ptr, (*C.FT_Byte)(cFontData), C.FT_Long(len(fontData)), C.FT_Long(ffl.Index), &face)
+	errCode := C.FT_New_Memory_Face(db.lib.ptr, (*C.FT_Byte)(cFontData), C.FT_Long(len(fontData)), C.FT_Long(source.Index), &face)
 	if errCode != 0 {
 		return fmt.Errorf("parse font error, error code: %d", int(errCode))
 	}
@@ -352,19 +349,12 @@ func (db *FontDataBase) CheckGlyph(ffl *FontFaceLocation, fontSet ass.CodepointS
 		}
 	}
 	if len(missingCodepoints) > 0 {
-		return NewErrMissCodepoints(fontDesc, missingCodepoints)
+		return NewErrMissCodepoints(fontDesc, source, missingCodepoints)
 	}
 	return nil
 }
 
-func (db *FontDataBase) CreatSubfont(subsetFontInfo *SubsetFontInfo) ([]byte, error) {
-	if subsetFontInfo == nil {
-		return nil, fmt.Errorf("subsetInfo is nil")
-	}
-	fontData, err := db.getFontData(subsetFontInfo.Source.Path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read font file %s: %w", subsetFontInfo.Source.Path, err)
-	}
+func (db *FontDataBase) CreatSubfont(subsetFontInfo *SubsetFontInfo, fontData []byte) ([]byte, error) {
 	cFontData := C.CBytes(fontData)
 	defer C.free(cFontData)
 

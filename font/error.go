@@ -10,6 +10,7 @@ var (
 	ErrNoValidFontName = errors.New("no valid font names found")
 	ErrNoValidFontFace = errors.New("no valid font face found")
 	ErrNoContainFace   = errors.New("font contains no valid faces")
+	ErrEmptySubsetData = errors.New("no subset font data collected")
 )
 
 type ErrUnsupportedID struct {
@@ -65,17 +66,19 @@ func (e *ErrGetSFNTName) Error() string {
 }
 
 type ErrMissCodepoints struct {
-	fontDesc          ass.FontDesc
+	fontDesc          *ass.FontDesc
+	source            *FontFaceLocation
 	missingCodepoints []rune
 }
 
 func (e *ErrMissCodepoints) Error() string {
-	return fmt.Sprintf(`missing codepoints for face "%s" (%d,%d) : %v`, e.fontDesc.FontName, e.fontDesc.Bold, e.fontDesc.Italic, formatCodepoints(e.missingCodepoints))
+	return fmt.Sprintf(`"%s"[%d] missing codepoints for face "%s" (%d,%d): %v`, e.source.Path, e.source.Index, e.fontDesc.FontName, e.fontDesc.Bold, e.fontDesc.Italic, formatCodepoints(e.missingCodepoints))
 }
 
-func NewErrMissCodepoints(fontDesc *ass.FontDesc, missingCodepoints []rune) *ErrMissCodepoints {
+func NewErrMissCodepoints(fontDesc *ass.FontDesc, source *FontFaceLocation, missingCodepoints []rune) *ErrMissCodepoints {
 	return &ErrMissCodepoints{
-		fontDesc:          *fontDesc,
+		fontDesc:          fontDesc,
+		source:            source,
 		missingCodepoints: missingCodepoints,
 	}
 }
