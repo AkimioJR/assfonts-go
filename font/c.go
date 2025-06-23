@@ -79,9 +79,8 @@ func (lib *FreeTypeLibrary) ParseFont(fontPath string, ignoreError bool) ([]Font
 	errCode := C.FT_New_Memory_Face(lib.ptr, (*C.FT_Byte)(cFontData), C.FT_Long(len(fontData)), 0, &metaFace) // 0表示加载第一个字体
 	if errCode != 0 {
 		return nil, fmt.Errorf("parse font error, error code: %d", int(errCode))
-	} else {
-		C.FT_Done_Face(metaFace) // 释放元字体对象
 	}
+	defer C.FT_Done_Face(metaFace)
 
 	facesNum := int64(metaFace.num_faces)              // 获取字体文件中的字体数量
 	fontFaceInfos := make([]FontFaceInfo, 0, facesNum) // 初始化字体信息切片
