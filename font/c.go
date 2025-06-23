@@ -189,7 +189,6 @@ func parseSfntName(ftFace C.FT_Face, nameIdx C.uint, families, fullnames, psname
 	if err != nil {
 		return err
 	}
-	// fmt.Println(name)
 
 	// 检查名称ID和平台ID，只处理特定的名称ID
 	// 0->TT_NAME_ID_COPYRIGHT版权
@@ -204,7 +203,6 @@ func parseSfntName(ftFace C.FT_Face, nameIdx C.uint, families, fullnames, psname
 		name.name_id != C.TT_NAME_ID_PS_NAME {
 		return &ErrUnsupportedPlatform{uint16(name.name_id)}
 	}
-	// fmt.Println("no skip name id:", name.name_id)
 
 	// 检查平台ID，只处理微软平台
 	// 0->TT_PLATFORM_UNICODE Unicode平台
@@ -216,7 +214,6 @@ func parseSfntName(ftFace C.FT_Face, nameIdx C.uint, families, fullnames, psname
 	if name.platform_id != C.TT_PLATFORM_MICROSOFT {
 		return &ErrUnsupportedPlatform{uint16(name.platform_id)}
 	}
-	// fmt.Println("no skip platform id:", name.platform_id)
 
 	// 拷贝原始字节
 	wbuf := C.GoBytes(unsafe.Pointer(name.string), C.int(name.string_len))
@@ -249,33 +246,23 @@ func parseSfntName(ftFace C.FT_Face, nameIdx C.uint, families, fullnames, psname
 	}
 
 	// 去除末尾的 '\0'
-	buf = strings.TrimRight(buf, "\x00")
-	if buf == "" {
+	buf = strings.ToLower(strings.TrimRight(buf, "\x00"))
+	if buf == "" || buf == "undefined" {
 		return nil
 	}
-	// fmt.Println("wbuf:", string(wbuf), "buf:", buf)
 
 	switch name.name_id { // 根据名称ID处理不同的名称
 	case C.TT_NAME_ID_FONT_FAMILY: // 字体家族名称
 		if !contains(*families, buf) {
-			family := strings.ToLower(buf)
-			if family != "" && family != "undefined" {
-				*families = append(*families, family)
-			}
+			*families = append(*families, buf)
 		}
 	case C.TT_NAME_ID_FULL_NAME: // 字体全名
 		if !contains(*fullnames, buf) {
-			fullname := strings.ToLower(buf)
-			if fullname != "" && fullname != "undefined" {
-				*fullnames = append(*fullnames, fullname)
-			}
+			*fullnames = append(*fullnames, buf)
 		}
 	case C.TT_NAME_ID_PS_NAME: // PostScript字体名称
 		if !contains(*psnames, buf) {
-			psname := strings.ToLower(buf)
-			if psname != "" && psname != "undefined" {
-				*psnames = append(*psnames, psname)
-			}
+			*psnames = append(*psnames, buf)
 		}
 	}
 	return nil
