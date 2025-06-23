@@ -285,6 +285,8 @@ func getAssFaceWeight(face C.FT_Face) uint {
 
 	if os2 != nil {
 		os2Weight = (*C.TT_OS2)(os2).usWeightClass // 需要将 os2 转换为 *C.TT_OS2 类型
+	} else {
+		return 400 // 如果OS/2表不存在，返回默认字重400
 	}
 
 	switch os2Weight { // 根据OS/2表的字重值返回对应的字重
