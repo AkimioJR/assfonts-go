@@ -11,9 +11,9 @@ import (
 )
 
 type FontDataBase struct {
-	lib          *FreeTypeLibrary          // FreeType 库实例
-	internalLib  bool                      // 是否内部创建 FreeType 库实例
-	FontListInDB map[string][]FontFaceInfo // path -> []FontFaceInfo
+	lib         *FreeTypeLibrary          // FreeType 库实例
+	internalLib bool                      // 是否内部创建 FreeType 库实例
+	data        map[string][]FontFaceInfo // path -> []FontFaceInfo
 }
 
 // 创建一个新的 FontDataBase 对象
@@ -22,9 +22,9 @@ type FontDataBase struct {
 // 注意：如果传入的 FreeTypeLibrary 是内部创建的，需要调用 Close() 方法
 func NewFontDataBase(lib *FreeTypeLibrary) (*FontDataBase, error) {
 	var db = FontDataBase{
-		lib:          lib,
-		internalLib:  false,
-		FontListInDB: make(map[string][]FontFaceInfo),
+		lib:         lib,
+		internalLib: false,
+		data:        make(map[string][]FontFaceInfo),
 	}
 	if lib == nil {
 		lib, err := NewFreeTypeLibrary()
@@ -59,24 +59,21 @@ func (fdb *FontDataBase) BuildDB(fontsDirs []string, withSystemFontPath bool, ig
 	}
 
 	for _, fontPath := range fontPaths {
-		fontInfos, err := fdb.lib.ParseFont(fontPath, ignoreError)
+		fontFaceInfos, err := fdb.lib.ParseFont(fontPath, ignoreError)
 		if err != nil {
 			if ignoreError {
 				continue
 			}
 			return fmt.Errorf("failed to parse font %s: %w", fontPath, err)
 		}
-		fdb.FontListInDB[fontPath] = fontInfos
+		fdb.data[fontPath] = fontFaceInfos
 	}
 	return nil
 }
 
-func (fp *FontDataBase) SaveDB(dbPath string) error {
-	var fis []FontFaceInfo
-	for _, fontInfos := range fp.FontListInDB {
-		fis = append(fis, fontInfos...)
-	}
-	data, err := json.MarshalIndent(fis, "", "  ")
+func (db *FontDataBase) SaveDB(dbPath string) error {
+
+	data, err := json.MarshalIndent(db.data, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal font data: %w", err)
 	}
@@ -87,24 +84,16 @@ func (fp *FontDataBase) SaveDB(dbPath string) error {
 }
 
 // LoadDB 加载字体数据库
-func (fdb *FontDataBase) LoadDB(dbPath string) error {
+func (db *FontDataBase) LoadDB(dbPath string) error {
 	data, err := os.ReadFile(dbPath)
 	if err != nil {
 		return fmt.Errorf(`cannot read fonts database: "%s"`, dbPath)
 	}
-	fdb.FontListInDB = make(map[string][]FontFaceInfo)
 
-	var fis []FontFaceInfo
-	if err := json.Unmarshal(data, &fis); err != nil {
+	if err := json.Unmarshal(data, &db.data); err != nil {
 		return fmt.Errorf(`cannot load fonts database: "%s"`, dbPath)
 	}
 
-	for _, fi := range fis {
-		if fdb.FontListInDB[fi.Source.Path] == nil {
-			fdb.FontListInDB[fi.Source.Path] = make([]FontFaceInfo, 0)
-		}
-		fdb.FontListInDB[fi.Source.Path] = append(fdb.FontListInDB[fi.Source.Path], fi)
-	}
 	return nil
 }
 
@@ -169,7 +158,7 @@ func (db *FontDataBase) FindFont(fontDesc *ass.FontDesc, fontSet ass.CodepointSe
 		minErr := math.MaxInt // 当前最小误差
 		var best = &FontFaceLocation{}
 
-		for path, fontInfos := range db.FontListInDB {
+		for path, fontFaceInfos := range db.data {
 			if minErr == 0 {
 				break
 			}
@@ -178,12 +167,12 @@ func (db *FontDataBase) FindFont(fontDesc *ass.FontDesc, fontSet ass.CodepointSe
 			if _, ok := acceptExts[ext]; !ok {
 				continue
 			}
-			for _, fontInfo := range fontInfos {
+			for _, fontFaceInfo := range fontFaceInfos {
 				var currentErr int // 当前误差
-				if contains(fontInfo.Families, fontname) {
-					currentErr = abs(int(fontDesc.Bold)-int(fontInfo.Weight)) + abs(int(fontDesc.Italic)-int(fontInfo.Slant))
+				if contains(fontFaceInfo.Families, fontname) {
+					currentErr = abs(int(fontDesc.Bold)-int(fontFaceInfo.Weight)) + abs(int(fontDesc.Italic)-int(fontFaceInfo.Slant))
 					// fmt.Println("find", fontname, "in", fontInfo.Families, "with score: ", score, "path: ", path)
-				} else if contains(fontInfo.FullNames, fontname) || contains(fontInfo.PSNames, fontname) {
+				} else if contains(fontFaceInfo.FullNames, fontname) || contains(fontFaceInfo.PSNames, fontname) {
 					currentErr = 0
 				} else {
 					continue
@@ -191,7 +180,7 @@ func (db *FontDataBase) FindFont(fontDesc *ass.FontDesc, fontSet ass.CodepointSe
 				if currentErr < minErr {
 					minErr = currentErr
 					best.Path = path
-					best.Index = fontInfo.Source.Index
+					best.Index = fontFaceInfo.Source.Index
 				}
 				if currentErr == 0 {
 					break
