@@ -32,37 +32,29 @@ func NewASSParser(reader io.Reader) (*ASSParser, error) {
 	}
 
 	var lineNum uint = 0
+	var inFontsSection = false
 	scanner := bufio.NewScanner(reader)
 	for scanner.Scan() {
 		lineNum++
 		line := scanner.Text() // 读取一行
-		if strings.TrimSpace(strings.ToLower(line)) == "[fonts]" {
+		temp := strings.TrimSpace(strings.ToLower(line))
+
+		switch temp {
+		case "[fonts]":
 			ap.HasFonts = true
-			ap.skipFontsLines(scanner, &lineNum) // 跳过字体块
-		} else {
-			ap.Texts = append(ap.Texts, TextInfo{LineNum: lineNum, Text: line}) // 将行添加到文本信息中
+			inFontsSection = true // 设置标志位
+			continue              // 跳过 [Fonts] 行
+		case "[events]", "[script info]", "[v4 styles]", "[v4+ styles]", "[graphics]":
+			inFontsSection = false // 清除标志位
+		}
+		if !inFontsSection {
+			ap.Texts = append(ap.Texts, TextInfo{LineNum: lineNum, Text: line})
 		}
 	}
 	if err := scanner.Err(); err != nil {
 		return nil, fmt.Errorf("failed to new ASSParser: %w", err)
 	}
 	return ap, nil
-}
-
-// skipFontsLines 跳过 [Fonts] 区块
-// 直到遇到下一个区块（如 [Events]、[Script Info] 等）返回
-// 该方法会修改 lineNum 的值，指向下一个未处理的行
-func (ap *ASSParser) skipFontsLines(scanner *bufio.Scanner, lineNum *uint) {
-	for scanner.Scan() {
-		*lineNum++
-		line := scanner.Text()
-		tmp := strings.TrimSpace(strings.ToLower(line))
-		if tmp == "[events]" || tmp == "[script info]" ||
-			tmp == "[v4 styles]" || tmp == "[v4+ styles]" || tmp == "[graphics]" {
-			ap.Texts = append(ap.Texts, TextInfo{LineNum: *lineNum, Text: line})
-			break
-		}
-	}
 }
 
 func (ap *ASSParser) Parse() error {
