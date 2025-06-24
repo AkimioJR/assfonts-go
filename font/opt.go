@@ -1,7 +1,5 @@
 package font
 
-type CheckErrFn func(error) bool
-
 type SubsetOption func(*subsetConfig)
 
 type subsetConfig struct {

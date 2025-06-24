@@ -39,3 +39,4 @@ type SubsetFontInfo struct {
 	Source     FontFaceLocation // 字体路径及索引
 }
 
+type CheckErrFn func(error) bool
