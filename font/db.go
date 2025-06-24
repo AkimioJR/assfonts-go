@@ -136,12 +136,38 @@ func (db *FontDataBase) getFontData(path string) ([]byte, error) {
 }
 
 // 读取 ass.ASSParser 中的所有字形，在 FontDataBase 中查找对应字体的路径，通过 CreatSubfont 子集化后返回子集化后的字体文件
-func (db *FontDataBase) Subset(ap *ass.ASSParser, fn func(error) bool, checkGlyph bool) (map[string][]byte, error) {
-	subsetFontInfos, err := db.parseSubsetFontInfos(ap, fn)
+func (db *FontDataBase) Subset(ap *ass.ASSParser, opts ...SubsetOption) (map[string][]byte, error) {
+	config := subsetConfig{
+		concurrent: false,
+		checkGlyph: false,
+		fn:         nil,
+	}
+	for _, opt := range opts {
+		opt(&config)
+	}
+
+	subsetFontInfos, err := db.parseSubsetFontInfos(ap, config.fn)
 	if err != nil {
 		return nil, fmt.Errorf("parse sub set info failed: %w", err)
 	}
 
+	var subFontDatas map[string][]byte
+	if config.concurrent {
+		subFontDatas, err = db.subsetConcurrent(subsetFontInfos, config.fn, config.checkGlyph)
+	} else {
+		subFontDatas, err = db.subsetSequential(subsetFontInfos, config.fn, config.checkGlyph)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+	if len(subFontDatas) == 0 {
+		return nil, ErrEmptySubsetData
+	}
+	return subFontDatas, nil
+}
+
+func (db *FontDataBase) subsetSequential(subsetFontInfos []SubsetFontInfo, fn func(error) bool, checkGlyph bool) (map[string][]byte, error) {
 	subFontDatas := make(map[string][]byte)
 
 	for _, sfi := range subsetFontInfos {
@@ -154,15 +180,10 @@ func (db *FontDataBase) Subset(ap *ass.ASSParser, fn func(error) bool, checkGlyp
 		}
 		subFontDatas[key] = subFontData
 	}
+
 	return subFontDatas, nil
 }
-
-func (db *FontDataBase) SubsetConcurrent(ap *ass.ASSParser, fn func(error) bool, checkGlyph bool) (map[string][]byte, error) {
-	subsetFontInfos, err := db.parseSubsetFontInfos(ap, fn)
-	if err != nil {
-		return nil, fmt.Errorf("parse sub set info failed: %w", err)
-	}
-
+func (db *FontDataBase) subsetConcurrent(subsetFontInfos []SubsetFontInfo, fn func(error) bool, checkGlyph bool) (map[string][]byte, error) {
 	type result struct {
 		key  string
 		data []byte
@@ -190,14 +211,11 @@ func (db *FontDataBase) SubsetConcurrent(ap *ass.ASSParser, fn func(error) bool,
 		close(results)
 	}()
 
-	// 收集结果并处理错误
 	subFontDatas := make(map[string][]byte, len(subsetFontInfos))
 	for r := range results {
 		subFontDatas[r.key] = r.data
 	}
-	if len(subFontDatas) == 0 {
-		return nil, ErrEmptySubsetData
-	}
+
 	return subFontDatas, nil
 }
 

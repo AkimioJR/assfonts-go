@@ -38,3 +38,4 @@ type SubsetFontInfo struct {
 	Codepoints ass.CodepointSet // 码点集合
 	Source     FontFaceLocation // 字体路径及索引
 }
+
