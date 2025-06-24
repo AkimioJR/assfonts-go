@@ -10,7 +10,7 @@ import (
 )
 
 type ASSParser struct {
-	Texts             []TextInfo                // 元素内容（不包含关于Font）
+	Contents          []ContentInfo             // 元素内容（不包含关于Font）
 	Styles            []StyleInfo               // 包含哪些样式
 	Dialogues         []DialogueInfo            // ASS 字幕 Dialogues 内容
 	RenameInfos       []RenameInfo              // 记录字体调用位置
@@ -22,7 +22,7 @@ type ASSParser struct {
 
 func NewASSParser(reader io.Reader) (*ASSParser, error) {
 	ap := &ASSParser{
-		Texts:             make([]TextInfo, 0, 200),
+		Contents:          make([]ContentInfo, 0, 200),
 		RenameInfos:       make([]RenameInfo, 0, 10),
 		FontSets:          make(map[FontDesc]CodepointSet),
 		HasFonts:          false,
@@ -47,7 +47,7 @@ func NewASSParser(reader io.Reader) (*ASSParser, error) {
 			inFontsSection = false // 清除标志位
 		}
 		if !inFontsSection {
-			ap.Texts = append(ap.Texts, TextInfo{LineNum: lineNum, Text: line})
+			ap.Contents = append(ap.Contents, ContentInfo{LineNum: lineNum, RawContent: line})
 		}
 	}
 	if err := scanner.Err(); err != nil {
@@ -60,10 +60,10 @@ func (ap *ASSParser) Parse() error {
 	var s parseState
 	var err error
 
-	for i := range ap.Texts {
+	for i := range ap.Contents {
 		s, err = ap.parseTxet(i, s)
 		if err != nil {
-			return fmt.Errorf("failed to parse text at line %d: %w", ap.Texts[i].LineNum, err)
+			return fmt.Errorf("failed to parse ass content at line %d: %w", ap.Contents[i].LineNum, err)
 		}
 	}
 
@@ -79,34 +79,34 @@ func (ap *ASSParser) Parse() error {
 }
 
 func (ap *ASSParser) parseTxet(i int, s parseState) (parseState, error) {
-	text := ap.Texts[i]
+	ci := ap.Contents[i]
 	// 检查区块开始
 	switch {
-	case startWith(text.Text, "[V4+ Styles]"), startWith(text.Text, "[V4 Styles]"):
+	case startWith(ci.RawContent, "[V4+ Styles]"), startWith(ci.RawContent, "[V4 Styles]"):
 		s.inStyleSection = true
 		s.inEventSection = false
 		return s, nil
 
-	case startWith(text.Text, "[Events]"):
+	case startWith(ci.RawContent, "[Events]"):
 		s.inEventSection = true
 		s.inStyleSection = false
 		return s, nil
-	case startWith(text.Text, "["):
+	case startWith(ci.RawContent, "["):
 		s.inStyleSection = false
 		s.inEventSection = false
 	}
 
 	// 根据当前状态处理行
 	switch {
-	case s.inStyleSection && startWith(text.Text, "Style:"):
-		err := ap.parseStyleLine(&text)
+	case s.inStyleSection && startWith(ci.RawContent, "Style:"):
+		err := ap.parseStyleLine(&ci)
 		if err != nil {
 			return s, ErrInvalidStyleFormat
 		}
 		s.hasStyle = true
 
-	case s.inEventSection && startWith(text.Text, "Dialogue:"):
-		err := ap.parseEventLine(&text)
+	case s.inEventSection && startWith(ci.RawContent, "Dialogue:"):
+		err := ap.parseEventLine(&ci)
 		if err != nil {
 			return s, err
 		}
@@ -116,15 +116,15 @@ func (ap *ASSParser) parseTxet(i int, s parseState) (parseState, error) {
 }
 
 // 解析单行样式
-func (ap *ASSParser) parseStyleLine(text *TextInfo) error {
-	fields := parseLine(text.Text, 10)
+func (ap *ASSParser) parseStyleLine(ci *ContentInfo) error {
+	fields := parseLine(ci.RawContent, 10)
 	if fields == nil {
 		return ErrInvalidStyleFormat
 	}
 
 	si := StyleInfo{
-		LineNum:    text.LineNum,
-		RawContent: text.Text,
+		LineNum:    ci.LineNum,
+		RawContent: ci.RawContent,
 		Style:      fields,
 	}
 	ap.Styles = append(ap.Styles, si)
@@ -133,14 +133,14 @@ func (ap *ASSParser) parseStyleLine(text *TextInfo) error {
 }
 
 // 解析单行事件
-func (ap *ASSParser) parseEventLine(text *TextInfo) error {
-	fields := parseLine(text.Text, 10)
+func (ap *ASSParser) parseEventLine(ci *ContentInfo) error {
+	fields := parseLine(ci.RawContent, 10)
 	if fields == nil {
 		return ErrInvalidEventFormat
 	}
 	di := DialogueInfo{
-		LineNum:    text.LineNum,
-		RawContent: text.Text,
+		LineNum:    ci.LineNum,
+		RawContent: ci.RawContent,
 		Dialogue:   fields,
 	}
 	ap.Dialogues = append(ap.Dialogues, di)
@@ -522,8 +522,8 @@ func (ap *ASSParser) WriteWithEmbeddedFonts(fontDatas map[string][]byte, writer 
 	insertedFonts := false
 	var err error
 
-	for _, text := range ap.Texts {
-		if !insertedFonts && strings.ToLower(strings.TrimSpace(text.Text)) == "[events]" {
+	for _, ci := range ap.Contents {
+		if !insertedFonts && strings.ToLower(strings.TrimSpace(ci.RawContent)) == "[events]" {
 			if _, err = writer.Write([]byte("[Fonts]")); err != nil {
 				goto fail
 			}
@@ -540,7 +540,7 @@ func (ap *ASSParser) WriteWithEmbeddedFonts(fontDatas map[string][]byte, writer 
 			}
 			insertedFonts = true
 		}
-		if _, err = writer.Write([]byte(text.Text + "\n")); err != nil {
+		if _, err = writer.Write([]byte(ci.RawContent + "\n")); err != nil {
 			goto fail
 		}
 	}

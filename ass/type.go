@@ -12,13 +12,11 @@ type RenameInfo struct {
 	End      uint   // 字体名称在原始样式行中结束位置的偏移量（字节偏移量）
 }
 
-// TextInfo 表示文本行
-type TextInfo struct {
-	LineNum uint   // 行号
-	Text    string // 文本内容
+type ContentInfo struct {
+	LineNum    uint   // 行号
+	RawContent string // 文本内容
 }
 
-// StyleInfo 对应 ASS 样式信息
 type StyleInfo struct {
 	LineNum    uint     // 行号
 	RawContent string   // 原始内容
