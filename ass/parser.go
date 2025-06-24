@@ -158,14 +158,14 @@ func (ap *ASSParser) setStyleNameFontDesc(style *StyleInfo) {
 		Italic:   0,   // 默认不斜体
 	}
 	if len(style.Style) > 8 {
-		if bold, err := calculateBold(style.Style[8]); err == nil {
+		if bold, err := calculateBold(style.Style[8]); err == nil || err == ErrInvalidBoldValue {
 			fd.Bold = bold // 计算粗体大小
 		} else {
 			fd.Bold = defaultFontSize // 如果计算失败，使用默认值
 		}
 	}
 	if len(style.Style) > 9 {
-		if italic, err := calculateItalic(style.Style[9]); err == nil {
+		if italic, err := calculateItalic(style.Style[9]); err == nil || err == ErrInvalidItalicValue {
 			fd.Italic = italic // 是否启用斜体
 		} else {
 			fd.Italic = defaultItalic // 如果计算失败，使用默认值
@@ -285,7 +285,7 @@ func (ap *ASSParser) StyleOverride(code []rune, currentFD *FontDesc, initialFD *
 			pos++
 			continue
 		}
-		
+
 		pos++                 // 跳过 '\'
 		if pos >= len(code) { // 如果已经到达字符串末尾，退出循环
 			break
@@ -317,7 +317,7 @@ func (ap *ASSParser) StyleOverride(code []rune, currentFD *FontDesc, initialFD *
 				var boldStr string
 				boldStr, pos = findTag(code, pos)
 				boldStr = strings.TrimSpace(boldStr)
-				if bold, err := calculateBold(boldStr); err == nil {
+				if bold, err := calculateBold(boldStr); err == nil || err == ErrInvalidBoldValue {
 					currentFDCopy.Bold = bold
 				}
 			}
@@ -326,7 +326,7 @@ func (ap *ASSParser) StyleOverride(code []rune, currentFD *FontDesc, initialFD *
 				var italicStr string
 				italicStr, pos = findTag(code, pos)
 				italicStr = strings.TrimSpace(italicStr)
-				if italic, err := calculateItalic(italicStr); err == nil {
+				if italic, err := calculateItalic(italicStr); err == nil || err == ErrInvalidItalicValue {
 					currentFDCopy.Italic = italic
 				}
 			}
