@@ -46,17 +46,23 @@ func findTag(code []rune, pos int) (string, int) {
 // 根据传入的字符串判断并返回对应的“粗体”数值
 // 转换失败时返回默认粗细大小 400
 // "1"和"-1"被认为是启用粗体返回 700
+// "0" 返回默认粗细大小
 // 否则返回其数值大小
 func calculateBold(raw string) (uint, error) {
 	value, err := strconv.Atoi(raw)
 	if err != nil {
 		return defaultFontSize, err
 	}
-	if value == 1 || value == -1 {
+
+	switch value {
+	case 1, -1:
 		return defaultBoldFontSize, nil
-	} else if value <= 0 {
-		return defaultFontSize, ErrInvalidBoldValue
-	} else {
+	case 0:
+		return defaultFontSize, nil
+	default:
+		if value < 0 {
+			return defaultFontSize, ErrInvalidBoldValue
+		}
 		return uint(value), nil
 	}
 }
