@@ -21,48 +21,6 @@ type ASSParser struct {
 	StyleNameFontDesc map[string]*FontDesc      // 样式描述
 }
 
-func NewASSParserWithParse(reader io.Reader) (*ASSParser, error) {
-	ap := &ASSParser{
-		Texts:             make([]TextInfo, 0, 200),
-		RenameInfos:       make([]RenameInfo, 0, 10),
-		FontSets:          make(map[FontDesc]CodepointSet),
-		HasFonts:          false,
-		HasDefaultStyle:   false,
-		StyleNameFontDesc: make(map[string]*FontDesc),
-	}
-
-	var (
-		inStyleSection bool // 标记是否在样式区块中
-		inEventSection bool // 标记是否在事件区块中
-		hasStyle       bool // 标记是否解析到样式
-		hasEvent       bool // 标记是否解析到事件
-	)
-
-	var lineNum uint = 0
-
-	scanner := bufio.NewScanner(reader)
-	for scanner.Scan() {
-		lineNum++
-		line := scanner.Text() // 读取一行
-		if strings.TrimSpace(strings.ToLower(line)) == "[fonts]" {
-			ap.HasFonts = true
-			ap.skipFontsLines(scanner, &lineNum) // 跳过字体块
-		} else {
-			ti := TextInfo{LineNum: lineNum, Text: line}
-			ap.Texts = append(ap.Texts, ti) // 将行添加到文本信息中
-			err := ap.parseTxet(&ti, &inStyleSection, &inEventSection, &hasStyle, &hasEvent)
-			if err != nil {
-				return nil, fmt.Errorf("failed to parse text at line %d: %w", lineNum, err)
-			}
-		}
-	}
-	if err := scanner.Err(); err != nil {
-		return nil, fmt.Errorf("failed to new ASSParser: %w", err)
-	}
-
-	ap.cleanFontSets()
-	return ap, nil
-}
 func NewASSParser(reader io.Reader) (*ASSParser, error) {
 	ap := &ASSParser{
 		Texts:             make([]TextInfo, 0, 200),
