@@ -16,7 +16,7 @@ type ASSParser struct {
 	FontSets          map[FontDesc]CodepointSet // 字体集
 	HasFonts          bool                      // 是否包含字体样式
 	HasDefaultStyle   bool                      // 是否有默认样式
-	StyleNameFontDesc map[string]*FontDesc      // 样式描述
+	StyleNameFontDesc map[string]FontDesc       // 样式描述
 }
 
 func NewASSParser(reader io.Reader) (*ASSParser, error) {
@@ -26,7 +26,7 @@ func NewASSParser(reader io.Reader) (*ASSParser, error) {
 		FontSets:          make(map[FontDesc]CodepointSet),
 		HasFonts:          false,
 		HasDefaultStyle:   false,
-		StyleNameFontDesc: make(map[string]*FontDesc),
+		StyleNameFontDesc: make(map[string]FontDesc),
 	}
 
 	var lineNum uint = 0
@@ -173,7 +173,7 @@ func (ap *ASSParser) setStyleNameFontDesc(style *StyleInfo) {
 			fd.Italic = defaultItalic // 如果计算失败，使用默认值
 		}
 	}
-	ap.StyleNameFontDesc[styleName] = &fd // 保存样式名称对应的字体描述
+	ap.StyleNameFontDesc[styleName] = fd // 保存样式名称对应的字体描述
 
 	renameInfo := RenameInfo{
 		FontName: fontname,
@@ -186,15 +186,14 @@ func (ap *ASSParser) setStyleNameFontDesc(style *StyleInfo) {
 
 // 统计每种字体样式实际用到的字符集合
 func (ap *ASSParser) parseDialogue(dialogue *DialogueInfo) error {
-	fd, err := ap.getFontDescStyle(dialogue)
+	localFD, err := ap.getFontDescStyle(dialogue)
 	if err != nil {
 		return fmt.Errorf("failed to get font description style for dialogue at line %d: %w", dialogue.Content.LineNum, err)
 	}
-	localFD := *fd // 复制字体描述，避免修改原始数据
 
 	// 初始化字体集合
-	if _, ok := ap.FontSets[*fd]; !ok {
-		ap.FontSets[*fd] = make(CodepointSet)
+	if _, ok := ap.FontSets[localFD]; !ok {
+		ap.FontSets[localFD] = make(CodepointSet)
 	}
 
 	if len(dialogue.Dialogue) < 10 {
@@ -204,7 +203,7 @@ func (ap *ASSParser) parseDialogue(dialogue *DialogueInfo) error {
 	runes := []rune(dialogue.Dialogue[9])
 	idx := 0
 	for idx < len(runes) {
-		idx = ap.gatherCharacter(runes, idx, &localFD, dialogue.Content.LineNum, &dialogue.Content.RawContent)
+		idx = ap.gatherCharacter(runes, idx, &localFD, dialogue.Content)
 	}
 	return nil
 }
@@ -224,7 +223,7 @@ func (ap *ASSParser) cleanFontSets() {
 
 // 获取对话对应的字体样式
 // 不会对传入的 DialogueInfo 进行修改
-func (p *ASSParser) getFontDescStyle(dialogue *DialogueInfo) (*FontDesc, error) {
+func (p *ASSParser) getFontDescStyle(dialogue *DialogueInfo) (FontDesc, error) {
 	// Dialogue: 0,0:00:31.43,0:00:34.45,Default,NTP,0,0,0,,反复读了很多遍之后让我明白了不少事情
 
 	var styleName string = defaultFontName // 默认样式
@@ -236,7 +235,7 @@ func (p *ASSParser) getFontDescStyle(dialogue *DialogueInfo) (*FontDesc, error) 
 		if p.HasDefaultStyle {
 			fd = p.StyleNameFontDesc[defaultFontName]
 		} else {
-			return nil, fmt.Errorf("style '%s' not found", styleName)
+			return FontDesc{}, fmt.Errorf("style '%s' not found", styleName)
 		}
 	}
 	return fd, nil
@@ -245,8 +244,7 @@ func (p *ASSParser) getFontDescStyle(dialogue *DialogueInfo) (*FontDesc, error) 
 // 处理对话文本中的每个字符，收集字体用到的字符
 // 返回下一个未处理字符的索引
 // fd 是当前对话使用的字体描述（不会进行修改）
-// 注意：此方法会修改 idx 的值，指向下一个未处理的字符
-func (ap *ASSParser) gatherCharacter(runes []rune, idx int, localFD *FontDesc, lineNum uint, rawContent *string) int {
+func (ap *ASSParser) gatherCharacter(runes []rune, idx int, localFD *FontDesc, ci *ContentInfo) int {
 	// 跳过 \h（空格） \n \N（换行）
 	if idx < len(runes)-1 && runes[idx] == '\\' && (runes[idx+1] == 'h' || runes[idx+1] == 'n' || runes[idx+1] == 'N') {
 		return idx + 2
@@ -269,7 +267,7 @@ func (ap *ASSParser) gatherCharacter(runes []rune, idx int, localFD *FontDesc, l
 			return idx + 1
 		} else { // 处理样式覆盖
 			override := string(runes[idx+1 : endIdx]) // \fad(500,0)\fnB3CJROEU\fs22\frz19.65\c&H6C6D6F&\pos(468,349)
-			ap.styleOverride(override, localFD, lineNum, rawContent)
+			ap.styleOverride(override, localFD, ci)
 			return endIdx + 1
 		}
 	}
@@ -284,18 +282,19 @@ func (ap *ASSParser) gatherCharacter(runes []rune, idx int, localFD *FontDesc, l
 }
 
 // 样式覆盖处理
-func (ap *ASSParser) styleOverride(code string, localFD *FontDesc, lineNum uint, rawContent *string) {
+func (ap *ASSParser) styleOverride(code string, localFD *FontDesc, ci *ContentInfo) {
 	// code \fad(500,0)\fnB3CJROEU\fs22\frz19.65\c&H6C6D6F&\pos(468,349)
 
-	fontPos := ap.changeFontname(code, localFD, lineNum, rawContent)
+	fontPos := ap.changeFontname(code, localFD, ci)
 	boldPos := ap.changeBold(code, localFD)
 	italicPos := ap.changeItalic(code, localFD)
-	ap.changeStyle(code, localFD, lineNum, fontPos, boldPos, italicPos)
+	ap.changeStyle(code, localFD, ci.LineNum, fontPos, boldPos, italicPos)
 }
 
 // 查找并处理 \fn 字体名覆盖
 // 返回最后处理的位置
-func (ap *ASSParser) changeFontname(code string, fd *FontDesc, lineNum uint, rawContent *string) int {
+func (ap *ASSParser) changeFontname(code string, fd *FontDesc, ci *ContentInfo) int {
+	// {\fad(200,0)\fnSource Han Sans CN\3c&H585857&\bord4}弹得超好！难不成是专业…？笑\N\N高潮位真的很赞
 	pos := 0
 	lastPos := 0
 
@@ -325,13 +324,13 @@ func (ap *ASSParser) changeFontname(code string, fd *FontDesc, lineNum uint, raw
 		fd.FontName = fontView
 
 		// 记录 RenameInfo
-		beg := strings.Index(*rawContent, fontView)
+		beg := strings.Index(ci.RawContent, fontView)
 		var end int
 		if beg != -1 {
 			end = beg + len(fontView)
 		}
 		renameInfo := RenameInfo{
-			LineNum:  lineNum,
+			LineNum:  ci.LineNum,
 			Begin:    uint(beg),
 			End:      uint(end),
 			FontName: fontView,
@@ -441,7 +440,7 @@ func (ap *ASSParser) changeStyle(code string, localFD *FontDesc, lineNum uint, f
 		if !ok {
 			fmt.Printf("Style \"%s\" not found. (Line %d)\n", styleName, lineNum)
 		} else {
-			updateFD = *desc // 复制字体描述，避免修改原始数据
+			updateFD = desc // 复制字体描述，避免修改原始数据
 		}
 		pos = endIdx
 	}
