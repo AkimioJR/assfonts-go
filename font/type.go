@@ -24,14 +24,18 @@ type FontFaceLocation struct {
 	Index uint   `json:"index"` // 字体集合中的索引位置
 }
 
+type FontName struct {
+	FamilyNames []string `json:"family_names"` // 字体家族名称列表
+	FullNames   []string `json:"full_names"`   // 字体完整名称列表
+	PSNames     []string `json:"ps_names"`     // PostScript 名称列表
+}
+
 type FontFaceInfo struct {
-	Source    FontFaceLocation `json:"source"`    // 字体来源信息
-	Families  []string         `json:"families"`  // 字体家族名称列表
-	FullNames []string         `json:"fullnames"` // 字体完整名称列表
-	PSNames   []string         `json:"psnames"`   // PostScript 名称列表
-	Weight    uint             `json:"weight"`    // 字重
-	Slant     uint             `json:"slant"`     // 倾斜角度
-	Modified  time.Time        `json:"modified"`  // 字体文件最后修改时间
+	Source   FontFaceLocation `json:"source"`   // 字体来源信息
+	Name     FontName         `json:"name"`     // 字体名称信息
+	Weight   uint             `json:"weight"`   // 字重
+	Slant    uint             `json:"slant"`    // 倾斜角度
+	Modified time.Time        `json:"modified"` // 字体文件最后修改时间
 }
 type SubsetFontInfo struct {
 	FontsDesc  ass.FontDesc     // 字体描述列表

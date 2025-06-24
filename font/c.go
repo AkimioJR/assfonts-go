@@ -122,21 +122,21 @@ func (lib *FreeTypeLibrary) ParseFont(fontPath string, fn func(error) bool) ([]F
 }
 
 func (lib *FreeTypeLibrary) parseFace(face C.FT_Face, fn func(error) bool) (*FontFaceInfo, error) {
-	var (
-		families  []string = make([]string, 0) // 字体家族
-		fullnames []string = make([]string, 0) // 字体全名
-		psnames   []string = make([]string, 0) // PostScript字体名称
-	)
+	fontNmae := FontName{
+		FamilyNames: make([]string, 0),
+		FullNames:   make([]string, 0),
+		PSNames:     make([]string, 0),
+	}
 
 	if C.FT_Has_PS_Glyph_Names(face) != 0 { // 检查是否有PostScript字形名称
 		var fontInfo C.PS_FontInfoRec
 
 		if C.FT_Get_PS_Font_Info(face, &fontInfo) == 0 { // 获取PostScript字体信息
 			if fontInfo.family_name != nil {
-				families = append(families, C.GoString((*C.char)(fontInfo.family_name)))
+				fontNmae.FamilyNames = append(fontNmae.FamilyNames, C.GoString((*C.char)(fontInfo.family_name)))
 			}
 			if fontInfo.full_name != nil {
-				fullnames = append(fullnames, C.GoString((*C.char)(fontInfo.full_name)))
+				fontNmae.FullNames = append(fontNmae.FullNames, C.GoString((*C.char)(fontInfo.full_name)))
 			}
 		}
 
@@ -144,22 +144,20 @@ func (lib *FreeTypeLibrary) parseFace(face C.FT_Face, fn func(error) bool) (*Fon
 
 	namesNum := int(C.FT_Get_Sfnt_Name_Count(face)) // 获取字体名称数量
 	for i := range namesNum {
-		err := parseSfntName(face, C.uint(i), &families, &fullnames, &psnames)
+		err := parseSfntName(face, C.uint(i), &fontNmae)
 		if err != nil && fn != nil {
 			fn(err)
 		}
 	}
 
-	if len(families) == 0 && len(fullnames) == 0 && len(psnames) == 0 {
+	if len(fontNmae.FamilyNames) == 0 && len(fontNmae.FullNames) == 0 && len(fontNmae.PSNames) == 0 {
 		return nil, ErrNoValidFontName
 	}
 
 	fontFaceInfo := FontFaceInfo{
-		Families:  families,
-		FullNames: fullnames,
-		PSNames:   psnames,
-		Weight:    getAssFaceWeight(face), // 字重
-		Slant:     getAssFaceSlant(face),  // 0或110，斜体角度
+		Name:   fontNmae,               // 字体名称信息
+		Weight: getAssFaceWeight(face), // 字重
+		Slant:  getAssFaceSlant(face),  // 0或110，斜体角度
 	}
 	return &fontFaceInfo, nil
 }
@@ -174,7 +172,7 @@ func ftGetSfntName(ftFace C.FT_Face, nameIdx C.uint) (*C.FT_SfntName, error) {
 }
 
 // 解析Sfnt名称
-func parseSfntName(ftFace C.FT_Face, nameIdx C.uint, families, fullnames, psnames *[]string) error {
+func parseSfntName(ftFace C.FT_Face, nameIdx C.uint, fn *FontName) error {
 	name, err := ftGetSfntName(ftFace, nameIdx)
 	if err != nil {
 		return err
@@ -243,16 +241,16 @@ func parseSfntName(ftFace C.FT_Face, nameIdx C.uint, families, fullnames, psname
 
 	switch name.name_id { // 根据名称ID处理不同的名称
 	case C.TT_NAME_ID_FONT_FAMILY: // 字体家族名称
-		if !contains(*families, buf) {
-			*families = append(*families, buf)
+		if !contains(fn.FamilyNames, buf) {
+			fn.FamilyNames = append(fn.FamilyNames, buf)
 		}
 	case C.TT_NAME_ID_FULL_NAME: // 字体全名
-		if !contains(*fullnames, buf) {
-			*fullnames = append(*fullnames, buf)
+		if !contains(fn.FullNames, buf) {
+			fn.FullNames = append(fn.FullNames, buf)
 		}
 	case C.TT_NAME_ID_PS_NAME: // PostScript字体名称
-		if !contains(*psnames, buf) {
-			*psnames = append(*psnames, buf)
+		if !contains(fn.PSNames, buf) {
+			fn.PSNames = append(fn.PSNames, buf)
 		}
 	}
 	return nil

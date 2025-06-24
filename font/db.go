@@ -288,10 +288,10 @@ func (db *FontDataBase) FindFont(fontDesc *ass.FontDesc, fontSet ass.CodepointSe
 				var currentErr int = math.MaxInt // 当前误差
 				found := false
 
-				if contains(fontFaceInfo.FullNames, targetName) || contains(fontFaceInfo.PSNames, targetName) { // 精确匹配，全名一致
+				if contains(fontFaceInfo.Name.FullNames, targetName) || contains(fontFaceInfo.Name.PSNames, targetName) { // 精确匹配，全名一致
 					found = true
 					currentErr = 0
-				} else if contains(fontFaceInfo.Families, targetName) { // 检查家族名
+				} else if contains(fontFaceInfo.Name.FamilyNames, targetName) { // 检查家族名
 					currentErr = abs(int(fontDesc.Bold)-int(fontFaceInfo.Weight)) + abs(int(fontDesc.Italic)-int(fontFaceInfo.Slant))
 					found = true
 				}
