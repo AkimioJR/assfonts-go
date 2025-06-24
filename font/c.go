@@ -128,26 +128,20 @@ func (lib *FreeTypeLibrary) parseFace(face C.FT_Face, fn func(error) bool) (*Fon
 		psnames   []string = make([]string, 0) // PostScript字体名称
 	)
 
-	// if C.FT_Has_PS_Glyph_Names(face) != 0 { // 检查是否有PostScript字形名称
-	// 	// var fontInfo C.PS_FontInfo = nil
-	// 	fontInfo := (C.PS_FontInfo)(C.malloc(C.sizeof_PS_FontInfo))
-	// 	defer C.free(unsafe.Pointer(fontInfo))
+	if C.FT_Has_PS_Glyph_Names(face) != 0 { // 检查是否有PostScript字形名称
+		var fontInfo C.PS_FontInfoRec
 
-	// 	if C.FT_Get_PS_Font_Info(face, fontInfo) == 0 { // 获取PostScript字体信息
-	// 		if fontInfo != nil {
-	// 			fmt.Println("PostScript Font Info found")
-	// 			fmt.Scanf("%s", &fontInfo) // 调试用，等待用户输入
-	// 			family := C.GoString((*C.char)(fontInfo.family_name))
-	// 			fullname := C.GoString((*C.char)(fontInfo.full_name))
-	// 			families = append(families, family)
-	// 			fullnames = append(fullnames, fullname)
-	// 		}
-	// 	}
-	// 	// 	fmt.Println("Error getting PS font info:", err)
+		if C.FT_Get_PS_Font_Info(face, &fontInfo) == 0 { // 获取PostScript字体信息
+			if fontInfo.family_name != nil {
+				families = append(families, C.GoString((*C.char)(fontInfo.family_name)))
+			}
+			if fontInfo.full_name != nil {
+				fullnames = append(fullnames, C.GoString((*C.char)(fontInfo.full_name)))
+			}
+		}
 
-	// }
+	}
 
-	// 	fmt.Println("No PS Glyph Names found in the font.")
 	namesNum := int(C.FT_Get_Sfnt_Name_Count(face)) // 获取字体名称数量
 	for i := range namesNum {
 		err := parseSfntName(face, C.uint(i), &families, &fullnames, &psnames)
@@ -159,10 +153,6 @@ func (lib *FreeTypeLibrary) parseFace(face C.FT_Face, fn func(error) bool) (*Fon
 	if len(families) == 0 && len(fullnames) == 0 && len(psnames) == 0 {
 		return nil, ErrNoValidFontName
 	}
-
-	// 	fmt.Printf("Families: %v\n", families)
-	// 	fmt.Printf("Fullnames: %v\n", fullnames)
-	// 	fmt.Printf("PS Names: %v\n", psnames)
 
 	fontFaceInfo := FontFaceInfo{
 		Families:  families,
