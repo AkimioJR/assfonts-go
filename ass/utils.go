@@ -16,6 +16,7 @@ func startWith(raw string, prefix string) bool {
 // writer: 需要写入的对象
 // insertLinebreaks: 控制是否每 80 个字符插入换行
 func UUEncode(data []byte, writer io.Writer, insertLinebreaks bool) error {
+	var err error
 	size := len(data)
 	written := 0
 
@@ -32,17 +33,19 @@ func UUEncode(data []byte, writer io.Writer, insertLinebreaks bool) error {
 
 		for i := 0; i < min(n+1, 4); i++ {
 			b := dst[i] + 33
-			if _, err := writer.Write([]byte{b}); err != nil {
-				return fmt.Errorf("write error when UUencoding: %w", err)
+			if _, err = writer.Write([]byte{b}); err != nil {
+				goto fail
 			}
 			written++
 			if insertLinebreaks && written == 80 && pos+3 < size {
-				if _, err := writer.Write([]byte{'\n'}); err != nil {
-					return fmt.Errorf("write error when UUencoding: %w", err)
+				if _, err = writer.Write([]byte{'\n'}); err != nil {
+					goto fail
 				}
 				written = 0
 			}
 		}
 	}
 	return nil
+fail:
+	return fmt.Errorf("write error when UUencoding: %w", err)
 }
