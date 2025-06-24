@@ -2,7 +2,6 @@ package ass
 
 import (
 	"bufio"
-	"bytes"
 	"fmt"
 	"io"
 	"strconv"
@@ -524,9 +523,7 @@ func (ap *ASSParser) WriteWithEmbeddedFonts(fontDatas map[string][]byte, writer 
 	var err error
 
 	for _, text := range ap.Texts {
-		content := []byte(text.Text)
-		trimmed := bytes.TrimSpace(bytes.ToLower(content))
-		if !insertedFonts && bytes.Equal(trimmed, []byte("[events]")) {
+		if !insertedFonts && strings.ToLower(strings.TrimSpace(text.Text)) == "[events]" {
 			if _, err = writer.Write([]byte("[Fonts]")); err != nil {
 				goto fail
 			}
@@ -543,10 +540,7 @@ func (ap *ASSParser) WriteWithEmbeddedFonts(fontDatas map[string][]byte, writer 
 			}
 			insertedFonts = true
 		}
-		if _, err = writer.Write(content); err != nil {
-			goto fail
-		}
-		if _, err = writer.Write([]byte("\n")); err != nil {
+		if _, err = writer.Write([]byte(text.Text + "\n")); err != nil {
 			goto fail
 		}
 	}
