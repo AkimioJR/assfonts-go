@@ -55,3 +55,10 @@ var (
 	ErrInvalidBoldValue   = errors.New("invalid bold value")    // 不合法字重值
 	ErrInvalidItalicValue = errors.New("invalid italic value")  // 不合法斜体值
 )
+
+type parseState struct {
+	inStyleSection bool // 是否在 [V4 Styles] 模块中
+	inEventSection bool // 是否在 [Events] 模块中
+	hasStyle       bool // 是否已找到 [V4 Styles] 模块
+	hasEvent       bool // 是否已找到 [Events] 模块
+}

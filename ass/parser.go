@@ -58,65 +58,62 @@ func NewASSParser(reader io.Reader) (*ASSParser, error) {
 }
 
 func (ap *ASSParser) Parse() error {
-	var (
-		inStyleSection bool // 标记是否在样式区块中
-		inEventSection bool // 标记是否在事件区块中
-		hasStyle       bool // 标记是否解析到样式
-		hasEvent       bool // 标记是否解析到事件
-	)
+	var s parseState
+	var err error
 
-	for _, ti := range ap.Texts {
-		err := ap.parseTxet(&ti, &inStyleSection, &inEventSection, &hasStyle, &hasEvent)
+	for i := range ap.Texts {
+		s, err = ap.parseTxet(i, s)
 		if err != nil {
-			return fmt.Errorf("failed to parse text at line %d: %w", ti.LineNum, err)
+			return fmt.Errorf("failed to parse text at line %d: %w", ap.Texts[i].LineNum, err)
 		}
 	}
 
 	// 验证必要区块
-	if !hasStyle {
+	if !s.hasStyle {
 		return ErrStyleParseFailed
 	}
-	if !hasEvent {
+	if !s.hasEvent {
 		return ErrEventParseFailed
 	}
 	ap.cleanFontSets()
 	return nil
 }
 
-func (ap *ASSParser) parseTxet(text *TextInfo, inStyleSection *bool, inEventSection *bool, hasStyle *bool, hasEvent *bool) error {
+func (ap *ASSParser) parseTxet(i int, s parseState) (parseState, error) {
+	text := ap.Texts[i]
 	// 检查区块开始
 	switch {
 	case startWith(text.Text, "[V4+ Styles]"), startWith(text.Text, "[V4 Styles]"):
-		*inStyleSection = true
-		*inEventSection = false
-		return nil
+		s.inStyleSection = true
+		s.inEventSection = false
+		return s, nil
 
 	case startWith(text.Text, "[Events]"):
-		*inEventSection = true
-		*inStyleSection = false
-		return nil
+		s.inEventSection = true
+		s.inStyleSection = false
+		return s, nil
 	case startWith(text.Text, "["):
-		*inStyleSection = false
-		*inEventSection = false
+		s.inStyleSection = false
+		s.inEventSection = false
 	}
 
 	// 根据当前状态处理行
 	switch {
-	case *inStyleSection && startWith(text.Text, "Style:"):
-		err := ap.parseStyleLine(text)
+	case s.inStyleSection && startWith(text.Text, "Style:"):
+		err := ap.parseStyleLine(&text)
 		if err != nil {
-			return ErrInvalidStyleFormat
+			return s, ErrInvalidStyleFormat
 		}
-		*hasStyle = true
+		s.hasStyle = true
 
-	case *inEventSection && startWith(text.Text, "Dialogue:"):
-		err := ap.parseEventLine(text)
+	case s.inEventSection && startWith(text.Text, "Dialogue:"):
+		err := ap.parseEventLine(&text)
 		if err != nil {
-			return err
+			return s, err
 		}
-		*hasEvent = true
+		s.hasEvent = true
 	}
-	return nil
+	return s, nil
 }
 
 // 解析单行样式
