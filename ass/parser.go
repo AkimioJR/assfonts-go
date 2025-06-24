@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"strconv"
 	"strings"
 	"unicode"
 )
@@ -143,63 +142,6 @@ func (ap *ASSParser) parseEventLine(i int) error {
 	}
 	ap.Dialogues = append(ap.Dialogues, di)
 	return ap.parseDialogue(&di)
-}
-
-// 解析类似于 Style: 或 Dialogue: 这样的 ASS 行，将其各个属性分割出来
-// 返回切片的长度不会小于 numField
-func parseLine(line string, numField int) []string {
-	// Style: Default,方正准圆_GBK,48,&H00FFFFFF,&HF0000000,&H00665806,&H0058281B,0,0,0,0,100,100,1,0,1,2,0,2,30,30,10,1
-
-	// 先按冒号分割，再按逗号分割
-	parts := strings.SplitN(line, ":", 2)
-	if len(parts) < 2 {
-		return nil
-	}
-	fields := []string{strings.TrimSpace(parts[0])}
-	for _, f := range strings.SplitN(parts[1], ",", numField-1) {
-		fields = append(fields, strings.TrimSpace(f))
-	}
-	if len(fields) < numField {
-		return nil
-	}
-	return fields
-}
-
-// 根据传入的字符串判断并返回对应的“粗体”数值
-// 转换失败时返回默认粗细大小 400
-// "1"和"-1"被认为是启用粗体返回 700
-// 否则返回其数值大小
-func calculateBold(raw string) (uint, error) {
-	value, err := strconv.Atoi(raw)
-	if err != nil {
-		return defaultFontSize, err
-	}
-	if value == 1 || value == -1 {
-		return defaultBoldFontSize, nil
-	} else if value <= 0 {
-		return defaultFontSize, ErrInvalidBoldValue
-	} else {
-		return uint(value), nil
-	}
-}
-
-// 仅"1"和"-1"被认为是启用斜体
-func calculateItalic(raw string) (uint, error) {
-	value, err := strconv.Atoi(raw)
-	if err != nil {
-		return defaultItalic, err
-	}
-	switch value {
-	case 1, -1:
-		return defaultItalicSlant, nil
-	case 0:
-		return defaultItalic, nil
-	default:
-		if value < 0 {
-			return defaultItalic, ErrInvalidItalicValue
-		}
-		return uint(value), nil
-	}
 }
 
 func (ap *ASSParser) setStyleNameFontDesc(style *StyleInfo) {
