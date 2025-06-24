@@ -4,13 +4,6 @@ import "errors"
 
 type CodepointSet map[rune]struct{}
 
-type RenameInfo struct {
-	FontName string // 字体名（非样式名）
-	LineNum  uint   // 样式行号
-	Begin    uint   // 字体名称在原始样式行中的起始的偏移量（字节偏移量）
-	End      uint   // 字体名称在原始样式行中结束位置的偏移量（字节偏移量）
-}
-
 type ContentInfo struct {
 	LineNum    uint   // 行号
 	RawContent string // 文本内容

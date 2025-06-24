@@ -12,7 +12,6 @@ type ASSParser struct {
 	Contents          []ContentInfo             // 元素内容（不包含关于Font）
 	Styles            []StyleInfo               // 包含哪些样式
 	Dialogues         []DialogueInfo            // ASS 字幕 Dialogues 内容
-	RenameInfos       []RenameInfo              // 记录字体调用位置
 	FontSets          map[FontDesc]CodepointSet // 字体集
 	HasFonts          bool                      // 是否包含字体样式
 	HasDefaultStyle   bool                      // 是否有默认样式
@@ -22,7 +21,6 @@ type ASSParser struct {
 func NewASSParser(reader io.Reader) (*ASSParser, error) {
 	ap := &ASSParser{
 		Contents:          make([]ContentInfo, 0, 200),
-		RenameInfos:       make([]RenameInfo, 0, 10),
 		FontSets:          make(map[FontDesc]CodepointSet),
 		HasFonts:          false,
 		HasDefaultStyle:   false,
@@ -174,14 +172,6 @@ func (ap *ASSParser) setStyleNameFontDesc(style *StyleInfo) {
 		}
 	}
 	ap.StyleNameFontDesc[styleName] = fd // 保存样式名称对应的字体描述
-
-	renameInfo := RenameInfo{
-		FontName: fontname,
-		LineNum:  style.Content.LineNum,
-		Begin:    uint(strings.Index(style.Content.RawContent, fontname)),
-		End:      uint(strings.Index(style.Content.RawContent, fontname) + len(fontname)),
-	}
-	ap.RenameInfos = append(ap.RenameInfos, renameInfo)
 }
 
 // 统计每种字体样式实际用到的字符集合
@@ -285,7 +275,7 @@ func (ap *ASSParser) gatherCharacter(runes []rune, idx int, localFD *FontDesc, c
 func (ap *ASSParser) styleOverride(code string, localFD *FontDesc, ci *ContentInfo) {
 	// code \fad(500,0)\fnB3CJROEU\fs22\frz19.65\c&H6C6D6F&\pos(468,349)
 
-	fontPos := ap.changeFontname(code, localFD, ci)
+	fontPos := ap.changeFontname(code, localFD)
 	boldPos := ap.changeBold(code, localFD)
 	italicPos := ap.changeItalic(code, localFD)
 	ap.changeStyle(code, localFD, ci.LineNum, fontPos, boldPos, italicPos)
@@ -293,7 +283,7 @@ func (ap *ASSParser) styleOverride(code string, localFD *FontDesc, ci *ContentIn
 
 // 查找并处理 \fn 字体名覆盖
 // 返回最后处理的位置
-func (ap *ASSParser) changeFontname(code string, fd *FontDesc, ci *ContentInfo) int {
+func (ap *ASSParser) changeFontname(code string, fd *FontDesc) int {
 	// {\fad(200,0)\fnSource Han Sans CN\3c&H585857&\bord4}弹得超好！难不成是专业…？笑\N\N高潮位真的很赞
 	pos := 0
 	lastPos := 0
@@ -322,20 +312,6 @@ func (ap *ASSParser) changeFontname(code string, fd *FontDesc, ci *ContentInfo) 
 			continue // 如果没有指定字体名，使用原字体名
 		}
 		fd.FontName = fontView
-
-		// 记录 RenameInfo
-		beg := strings.Index(ci.RawContent, fontView)
-		var end int
-		if beg != -1 {
-			end = beg + len(fontView)
-		}
-		renameInfo := RenameInfo{
-			LineNum:  ci.LineNum,
-			Begin:    uint(beg),
-			End:      uint(end),
-			FontName: fontView,
-		}
-		ap.RenameInfos = append(ap.RenameInfos, renameInfo)
 	}
 
 	return lastPos
