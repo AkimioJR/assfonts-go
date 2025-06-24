@@ -239,10 +239,21 @@ func (p *ASSParser) getFontDescStyle(dialogue *DialogueInfo) (FontDesc, error) {
 // 返回下一个未处理字符的索引
 // fd 是当前对话使用的字体描述（不会进行修改）
 func (ap *ASSParser) gatherCharacter(runes []rune, idx int, currentFD *FontDesc, initialFD *FontDesc, ci *ContentInfo) int {
-	// 跳过 \h（空格） \n \N（换行）
-	if idx < len(runes)-1 && runes[idx] == '\\' && (runes[idx+1] == 'h' || runes[idx+1] == 'n' || runes[idx+1] == 'N') {
-		return idx + 2
+	if idx < len(runes)-1 && runes[idx] == '\\' {
+		switch runes[idx+1] {
+		case 'h', 'n', 'N': // 跳过 \h \n \N
+			return idx + 2
+		case '{', '}': // 转译 \{ \}
+			if currentFD.FontName != "" {
+				if _, ok := ap.FontSets[*currentFD]; !ok {
+					ap.FontSets[*currentFD] = make(CodepointSet)
+				}
+				ap.FontSets[*currentFD][runes[idx]] = struct{}{}
+			}
+			return idx + 1 // 跳过 \{ \}
+		}
 	}
+
 	// 样式覆盖段 {...}
 	// Dialogue: 0,0:20:01.88,0:20:06.05,mianze,NTP,0,0,0,,{\fade(500,500)}本字幕由动漫国字幕组制作(dmguo.org)\N仅供试看,请支持购买正版音像制品
 	if runes[idx] == '{' {
