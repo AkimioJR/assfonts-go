@@ -61,7 +61,7 @@ func (ap *ASSParser) Parse() error {
 	var err error
 
 	for i := range ap.Contents {
-		s, err = ap.parseTxet(i, s)
+		s, err = ap.parseContent(i, s)
 		if err != nil {
 			return fmt.Errorf("failed to parse ass content at line %d: %w", ap.Contents[i].LineNum, err)
 		}
@@ -78,7 +78,7 @@ func (ap *ASSParser) Parse() error {
 	return nil
 }
 
-func (ap *ASSParser) parseTxet(i int, s parseState) (parseState, error) {
+func (ap *ASSParser) parseContent(i int, s parseState) (parseState, error) {
 	ci := ap.Contents[i]
 	// 检查区块开始
 	switch {
@@ -99,14 +99,14 @@ func (ap *ASSParser) parseTxet(i int, s parseState) (parseState, error) {
 	// 根据当前状态处理行
 	switch {
 	case s.inStyleSection && startWith(ci.RawContent, "Style:"):
-		err := ap.parseStyleLine(&ci)
+		err := ap.parseStyleLine(i)
 		if err != nil {
 			return s, ErrInvalidStyleFormat
 		}
 		s.hasStyle = true
 
 	case s.inEventSection && startWith(ci.RawContent, "Dialogue:"):
-		err := ap.parseEventLine(&ci)
+		err := ap.parseEventLine(i)
 		if err != nil {
 			return s, err
 		}
@@ -116,16 +116,15 @@ func (ap *ASSParser) parseTxet(i int, s parseState) (parseState, error) {
 }
 
 // 解析单行样式
-func (ap *ASSParser) parseStyleLine(ci *ContentInfo) error {
-	fields := parseLine(ci.RawContent, 10)
+func (ap *ASSParser) parseStyleLine(i int) error {
+	fields := parseLine(ap.Contents[i].RawContent, 10)
 	if fields == nil {
 		return ErrInvalidStyleFormat
 	}
 
 	si := StyleInfo{
-		LineNum:    ci.LineNum,
-		RawContent: ci.RawContent,
-		Style:      fields,
+		Content: &ap.Contents[i],
+		Style:   fields,
 	}
 	ap.Styles = append(ap.Styles, si)
 	ap.setStyleNameFontDesc(&si)
@@ -133,15 +132,14 @@ func (ap *ASSParser) parseStyleLine(ci *ContentInfo) error {
 }
 
 // 解析单行事件
-func (ap *ASSParser) parseEventLine(ci *ContentInfo) error {
-	fields := parseLine(ci.RawContent, 10)
+func (ap *ASSParser) parseEventLine(i int) error {
+	fields := parseLine(ap.Contents[i].RawContent, 10)
 	if fields == nil {
 		return ErrInvalidEventFormat
 	}
 	di := DialogueInfo{
-		LineNum:    ci.LineNum,
-		RawContent: ci.RawContent,
-		Dialogue:   fields,
+		Content:  &ap.Contents[i],
+		Dialogue: fields,
 	}
 	ap.Dialogues = append(ap.Dialogues, di)
 	return ap.parseDialogue(&di)
@@ -237,9 +235,9 @@ func (ap *ASSParser) setStyleNameFontDesc(style *StyleInfo) {
 
 	renameInfo := RenameInfo{
 		FontName: fontname,
-		LineNum:  style.LineNum,
-		Begin:    uint(strings.Index(style.RawContent, fontname)),
-		End:      uint(strings.Index(style.RawContent, fontname) + len(fontname)),
+		LineNum:  style.Content.LineNum,
+		Begin:    uint(strings.Index(style.Content.RawContent, fontname)),
+		End:      uint(strings.Index(style.Content.RawContent, fontname) + len(fontname)),
 	}
 	ap.RenameInfos = append(ap.RenameInfos, renameInfo)
 }
@@ -248,7 +246,7 @@ func (ap *ASSParser) setStyleNameFontDesc(style *StyleInfo) {
 func (ap *ASSParser) parseDialogue(dialogue *DialogueInfo) error {
 	fd, err := ap.getFontDescStyle(dialogue)
 	if err != nil {
-		return fmt.Errorf("failed to get font description style for dialogue at line %d: %w", dialogue.LineNum, err)
+		return fmt.Errorf("failed to get font description style for dialogue at line %d: %w", dialogue.Content.LineNum, err)
 	}
 	localFD := *fd // 复制字体描述，避免修改原始数据
 
@@ -258,14 +256,13 @@ func (ap *ASSParser) parseDialogue(dialogue *DialogueInfo) error {
 	}
 
 	if len(dialogue.Dialogue) < 10 {
-		// fmt.Println("Dialogue at line", dialogue.LineNum, "has no text content, skipping.", "\nrawContent:", dialogue.RawContent, "\nDialogue:", strings.Join(dialogue.Dialogue, "---"), "\nNum:", len(dialogue.Dialogue))
 		return nil // 如果没有对话文本内容就跳过
 	}
 
 	runes := []rune(dialogue.Dialogue[9])
 	idx := 0
 	for idx < len(runes) {
-		idx = ap.gatherCharacter(runes, idx, &localFD, dialogue.LineNum, &dialogue.RawContent)
+		idx = ap.gatherCharacter(runes, idx, &localFD, dialogue.Content.LineNum, &dialogue.Content.RawContent)
 	}
 	return nil
 }

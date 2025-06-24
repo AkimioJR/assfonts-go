@@ -4,7 +4,6 @@ import "errors"
 
 type CodepointSet map[rune]struct{}
 
-// RenameInfo 表示字体重命名信息
 type RenameInfo struct {
 	FontName string // 字体名（非样式名）
 	LineNum  uint   // 样式行号
@@ -18,19 +17,15 @@ type ContentInfo struct {
 }
 
 type StyleInfo struct {
-	LineNum    uint     // 行号
-	RawContent string   // 原始内容
-	Style      []string // 切分的字段
+	Content *ContentInfo // 原始内容
+	Style   []string     // 切分的字段
 }
 
-// DialogueInfo 对应 ASS 对话信息
 type DialogueInfo struct {
-	LineNum    uint     // 该 Dialogue 在原文件的行号
-	RawContent string   // Dialogue 原始内容
-	Dialogue   []string // Dialogue 切分后的字段
+	Content  *ContentInfo // 原始内容
+	Dialogue []string     // Dialogue 切分后的字段
 }
 
-// FontDesc 表示字体描述
 type FontDesc struct {
 	FontName string // 字体名称
 	Bold     uint   // 字粗
