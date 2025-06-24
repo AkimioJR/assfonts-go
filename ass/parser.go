@@ -139,7 +139,7 @@ func (ap *ASSParser) parseEventLine(i int) error {
 		Dialogue: fields,
 	}
 	ap.Dialogues = append(ap.Dialogues, di)
-	return ap.parseDialogue(&di)
+	return ap.ParseDialogue(&di)
 }
 
 func (ap *ASSParser) setStyleNameFontDesc(style *StyleInfo) {
@@ -175,15 +175,15 @@ func (ap *ASSParser) setStyleNameFontDesc(style *StyleInfo) {
 }
 
 // 统计每种字体样式实际用到的字符集合
-func (ap *ASSParser) parseDialogue(dialogue *DialogueInfo) error {
-	localFD, err := ap.getFontDescStyle(dialogue)
+func (ap *ASSParser) ParseDialogue(dialogue *DialogueInfo) error {
+	initialFD, err := ap.getFontDescStyle(dialogue)
 	if err != nil {
 		return fmt.Errorf("failed to get font description style for dialogue at line %d: %w", dialogue.Content.LineNum, err)
 	}
 
 	// 初始化字体集合
-	if _, ok := ap.FontSets[localFD]; !ok {
-		ap.FontSets[localFD] = make(CodepointSet)
+	if _, ok := ap.FontSets[initialFD]; !ok {
+		ap.FontSets[initialFD] = make(CodepointSet)
 	}
 
 	if len(dialogue.Dialogue) < 10 {
@@ -191,9 +191,12 @@ func (ap *ASSParser) parseDialogue(dialogue *DialogueInfo) error {
 	}
 
 	runes := []rune(dialogue.Dialogue[9])
+
+	currentFD := initialFD // 当前对话使用的字体描述
+
 	idx := 0
 	for idx < len(runes) {
-		idx = ap.gatherCharacter(runes, idx, &localFD, dialogue.Content)
+		idx = ap.gatherCharacter(runes, idx, &currentFD, &initialFD, dialogue.Content)
 	}
 	return nil
 }
@@ -217,13 +220,14 @@ func (p *ASSParser) getFontDescStyle(dialogue *DialogueInfo) (FontDesc, error) {
 	// Dialogue: 0,0:00:31.43,0:00:34.45,Default,NTP,0,0,0,,反复读了很多遍之后让我明白了不少事情
 
 	var styleName string = defaultFontName // 默认样式
-	if len(dialogue.Dialogue) > 4 {
+	if len(dialogue.Dialogue) > 4 && dialogue.Dialogue[4] != "" {
 		styleName = dialogue.Dialogue[4]
 	}
+
 	fd, ok := p.StyleNameFontDesc[styleName]
 	if !ok {
 		if p.HasDefaultStyle {
-			fd = p.StyleNameFontDesc[defaultFontName]
+			return p.StyleNameFontDesc[defaultFontName], nil // 如果没有找到指定样式，返回默认样式
 		} else {
 			return FontDesc{}, fmt.Errorf("style '%s' not found", styleName)
 		}
@@ -234,7 +238,7 @@ func (p *ASSParser) getFontDescStyle(dialogue *DialogueInfo) (FontDesc, error) {
 // 处理对话文本中的每个字符，收集字体用到的字符
 // 返回下一个未处理字符的索引
 // fd 是当前对话使用的字体描述（不会进行修改）
-func (ap *ASSParser) gatherCharacter(runes []rune, idx int, localFD *FontDesc, ci *ContentInfo) int {
+func (ap *ASSParser) gatherCharacter(runes []rune, idx int, currentFD *FontDesc, initialFD *FontDesc, ci *ContentInfo) int {
 	// 跳过 \h（空格） \n \N（换行）
 	if idx < len(runes)-1 && runes[idx] == '\\' && (runes[idx+1] == 'h' || runes[idx+1] == 'n' || runes[idx+1] == 'N') {
 		return idx + 2
@@ -248,190 +252,110 @@ func (ap *ASSParser) gatherCharacter(runes []rune, idx int, localFD *FontDesc, c
 		}
 		if endIdx >= len(runes) { // 没有找到 '}'，直接加入当前字符
 
-			if localFD.FontName != "" {
-				if _, ok := ap.FontSets[*localFD]; !ok {
-					ap.FontSets[*localFD] = make(CodepointSet)
+			if currentFD.FontName != "" {
+				if _, ok := ap.FontSets[*currentFD]; !ok {
+					ap.FontSets[*currentFD] = make(CodepointSet)
 				}
-				ap.FontSets[*localFD][runes[idx]] = struct{}{}
+				ap.FontSets[*currentFD][runes[idx]] = struct{}{}
 			}
 			return idx + 1
 		} else { // 处理样式覆盖
-			override := string(runes[idx+1 : endIdx]) // \fad(500,0)\fnB3CJROEU\fs22\frz19.65\c&H6C6D6F&\pos(468,349)
-			ap.styleOverride(override, localFD, ci)
+			// \fad(500,0)\fnB3CJROEU\fs22\frz19.65\c&H6C6D6F&\pos(468,349)
+			ap.StyleOverride(runes[idx+1:endIdx], currentFD, initialFD, ci)
 			return endIdx + 1
 		}
 	}
 	// 普通字符
-	if localFD.FontName != "" {
-		if _, ok := ap.FontSets[*localFD]; !ok {
-			ap.FontSets[*localFD] = make(CodepointSet)
+	if currentFD.FontName != "" {
+		if _, ok := ap.FontSets[*currentFD]; !ok {
+			ap.FontSets[*currentFD] = make(CodepointSet)
 		}
-		ap.FontSets[*localFD][runes[idx]] = struct{}{}
+		ap.FontSets[*currentFD][runes[idx]] = struct{}{}
 	}
 	return idx + 1
 }
 
-// 样式覆盖处理
-func (ap *ASSParser) styleOverride(code string, localFD *FontDesc, ci *ContentInfo) {
-	// code \fad(500,0)\fnB3CJROEU\fs22\frz19.65\c&H6C6D6F&\pos(468,349)
+func (ap *ASSParser) StyleOverride(code []rune, currentFD *FontDesc, initialFD *FontDesc, ci *ContentInfo) {
+	currentFDCopy := *currentFD // 创建当前字体描述的副本
 
-	fontPos := ap.changeFontname(code, localFD)
-	boldPos := ap.changeBold(code, localFD)
-	italicPos := ap.changeItalic(code, localFD)
-	ap.changeStyle(code, localFD, ci.LineNum, fontPos, boldPos, italicPos)
-}
-
-// 查找并处理 \fn 字体名覆盖
-// 返回最后处理的位置
-func (ap *ASSParser) changeFontname(code string, fd *FontDesc) int {
-	// {\fad(200,0)\fnSource Han Sans CN\3c&H585857&\bord4}弹得超好！难不成是专业…？笑\N\N高潮位真的很赞
 	pos := 0
-	lastPos := 0
-
-	for {
-		lastPos = pos
-		idx := strings.Index(code[pos:], `\fn`)
-		if idx == -1 {
-			break
-		}
-		pos += idx + 3 // 跳过 \fn
-		// 提取字体名，直到下一个反斜杠或结尾
-		rest := code[pos:]
-		endIdx := strings.Index(rest, `\`)
-		var fontView string
-		if endIdx == -1 {
-			fontView = rest
-			pos = len(code)
-		} else {
-			fontView = rest[:endIdx]
-			pos += endIdx
-		}
-		fontView = strings.TrimSpace(fontView)
-		fontView = strings.TrimPrefix(fontView, "@") // 去掉前缀 @（如果有的话）
-		if fontView == "" {
-			continue // 如果没有指定字体名，使用原字体名
-		}
-		fd.FontName = fontView
-	}
-
-	return lastPos
-}
-
-// 处理 \b 粗体覆盖
-func (ap *ASSParser) changeBold(code string, fd *FontDesc) int {
-	pos := 0
-	lastPos := 0
-	for {
-		lastPos = pos
-		idx := strings.Index(code[pos:], `\b`)
-		if idx == -1 {
-			break
-		}
-		pos += idx + 2 // 跳过 \b
-
-		// 检查下一个字符是否为数字、- 或空格
-		if pos >= len(code) || !(unicode.IsDigit(rune(code[pos])) || code[pos] == '-' || code[pos] == ' ') {
+	for pos < len(code) {
+		// 查找下一个标签开始位置
+		if code[pos] != '\\' {
+			pos++
 			continue
 		}
-
-		// 提取数字直到下一个反斜杠或结尾
-		endIdx := pos
-		for endIdx < len(code) && code[endIdx] != '\\' {
-			endIdx++
+		
+		pos++                 // 跳过 '\'
+		if pos >= len(code) { // 如果已经到达字符串末尾，退出循环
+			break
 		}
-		boldStr := strings.TrimSpace(code[pos:endIdx])
-		if boldStr != "" {
-			if bold, err := calculateBold(boldStr); err == nil {
-				fd.Bold = bold
+		tagChar := code[pos] // 获取标签的第一个字符
+		pos++                // 移动到标签内容开始位置
+		if pos >= len(code) {
+			break
+		}
+
+		switch tagChar {
+		case 'f': // 处理字体相关标签 (\fn, \fr, 等)
+			switch code[pos] {
+			case 'n': // \fn
+				pos++ // 跳过 'n'
+				if pos >= len(code) {
+					break // 如果已经到达字符串末尾，退出循环
+				}
+
+				var fontName string
+				fontName, pos = findTag(code, pos)
+				fontName = strings.TrimPrefix(strings.TrimSpace(fontName), "@")
+				if fontName != "" {
+					currentFDCopy.FontName = fontName
+				}
+			}
+		case 'b': // 处理粗体标签 (\b)
+			if pos < len(code) && (unicode.IsDigit(rune(code[pos])) || code[pos] == '-' || code[pos] == ' ') {
+				var boldStr string
+				boldStr, pos = findTag(code, pos)
+				boldStr = strings.TrimSpace(boldStr)
+				if bold, err := calculateBold(boldStr); err == nil {
+					currentFDCopy.Bold = bold
+				}
+			}
+		case 'i': // 处理斜体标签 (\i)
+			if pos < len(code) && (unicode.IsDigit(rune(code[pos])) || code[pos] == '-' || code[pos] == ' ') {
+				var italicStr string
+				italicStr, pos = findTag(code, pos)
+				italicStr = strings.TrimSpace(italicStr)
+				if italic, err := calculateItalic(italicStr); err == nil {
+					currentFDCopy.Italic = italic
+				}
+			}
+
+		case 'r': // 处理样式重置标签 (\r)
+			// 检查是否是\rnd标签
+			if pos+1 < len(code) && code[pos] == 'n' && code[pos+1] == 'd' {
+				pos += 2 // 跳过 "nd"
+				continue
+			}
+
+			var styleName string
+			styleName, pos = findTag(code, pos)
+			styleName = strings.TrimSpace(styleName)
+
+			if styleName == "" { // 无样式名时重置为初始样式
+				currentFDCopy = *initialFD
+			} else if desc, ok := ap.StyleNameFontDesc[styleName]; ok { // 找到指定样式，更新当前字体描述
+				currentFDCopy.FontName = desc.FontName
+				currentFDCopy.Bold = desc.Bold
+				currentFDCopy.Italic = desc.Italic
+			} else {
+				fmt.Printf("Style \"%s\" not found. (Line %d)\n", styleName, ci.LineNum)
 			}
 		}
-		pos = endIdx
 	}
-	return lastPos
+	*currentFD = currentFDCopy // 更新最终的字体描述
 }
 
-// 处理 \i 斜体覆盖
-func (ap *ASSParser) changeItalic(code string, fd *FontDesc) int {
-	pos := 0
-	lastPos := 0
-	for {
-		lastPos = pos
-		idx := strings.Index(code[pos:], `\i`)
-		if idx == -1 {
-			break
-		}
-		pos += idx + 2 // 跳过 \i
-
-		// 检查下一个字符是否为数字、- 或空格
-		if pos >= len(code) || !(unicode.IsDigit(rune(code[pos])) || code[pos] == '-' || code[pos] == ' ') {
-			continue
-		}
-
-		// 提取数字直到下一个反斜杠或结尾
-		endIdx := pos
-		for endIdx < len(code) && code[endIdx] != '\\' {
-			endIdx++
-		}
-		italicStr := strings.TrimSpace(code[pos:endIdx])
-		if italicStr != "" {
-			if italic, err := calculateItalic(italicStr); err == nil {
-				fd.Italic = italic
-			}
-		}
-		pos = endIdx
-	}
-	return lastPos
-}
-
-// 处理 \r 样式还原
-func (ap *ASSParser) changeStyle(code string, localFD *FontDesc, lineNum uint, fontPos int, boldPos int, italicPos int) {
-	pos := 0
-	lastPos := 0
-	updateFD := *localFD
-
-	for {
-		lastPos = pos
-		idx := strings.Index(code[pos:], `\r`)
-		if idx == -1 {
-			break
-		}
-		pos += idx + 2 // 跳过 \r
-
-		// 跳过 \rnd
-		if pos+2 <= len(code) && code[pos:pos+2] == "nd" {
-			continue
-		}
-
-		// 提取样式名直到下一个反斜杠或结尾
-		endIdx := pos
-		for endIdx < len(code) && code[endIdx] != '\\' {
-			endIdx++
-		}
-		styleName := strings.TrimSpace(code[pos:endIdx])
-		if styleName == "" {
-			pos = endIdx
-			continue
-		}
-		desc, ok := ap.StyleNameFontDesc[styleName]
-		if !ok {
-			fmt.Printf("Style \"%s\" not found. (Line %d)\n", styleName, lineNum)
-		} else {
-			updateFD = desc // 复制字体描述，避免修改原始数据
-		}
-		pos = endIdx
-	}
-
-	// 根据 lastPos 和 fontPos、boldPos、italicPos 判断应该哪个字段被更新
-	if lastPos > fontPos {
-		localFD.FontName = updateFD.FontName
-	}
-	if lastPos > boldPos {
-		localFD.Bold = updateFD.Bold
-	}
-	if lastPos > italicPos {
-		localFD.Italic = updateFD.Italic
-	}
-}
 func (ap *ASSParser) WriteWithEmbeddedFonts(fontDatas map[string][]byte, writer io.Writer) error {
 	insertedFonts := false
 	var err error
