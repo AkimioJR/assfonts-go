@@ -9,14 +9,23 @@ type ContentInfo struct {
 	RawContent string // 文本内容
 }
 
-type StyleInfo struct {
-	Content *ContentInfo // 原始内容
-	Style   []string     // 切分的字段
+// 新增：格式定义结构体
+type FormatInfo struct {
+	Fields []string // 字段名称列表
 }
 
+// 重新设计：样式信息结构体
+type StyleInfo struct {
+	Content    *ContentInfo    // 原始内容
+	Fields     map[string]string // 字段名->值的映射
+	FormatInfo *FormatInfo     // 格式定义
+}
+
+// 重新设计：对话信息结构体
 type DialogueInfo struct {
-	Content  *ContentInfo // 原始内容
-	Dialogue []string     // Dialogue 切分后的字段
+	Content    *ContentInfo    // 原始内容
+	Fields     map[string]string // 字段名->值的映射
+	FormatInfo *FormatInfo     // 格式定义
 }
 
 type FontDesc struct {
@@ -40,11 +49,15 @@ var (
 	ErrInvalidEventFormat = errors.New("invalid event format")  // Events 格式解析失败
 	ErrInvalidBoldValue   = errors.New("invalid bold value")    // 不合法字重值
 	ErrInvalidItalicValue = errors.New("invalid italic value")  // 不合法斜体值
+	ErrMissingFormat      = errors.New("missing format line")   // 缺少格式定义行
 )
 
+// 新增：解析状态结构体
 type parseState struct {
-	inStyleSection bool // 是否在 [V4 Styles] 模块中
-	inEventSection bool // 是否在 [Events] 模块中
-	hasStyle       bool // 是否已找到 [V4 Styles] 模块
-	hasEvent       bool // 是否已找到 [Events] 模块
+	inStyleSection  bool         // 是否在 [V4 Styles] 模块中
+	inEventSection  bool         // 是否在 [Events] 模块中
+	hasStyle        bool         // 是否已找到 [V4 Styles] 模块
+	hasEvent        bool         // 是否已找到 [Events] 模块
+	styleFormat     *FormatInfo  // 样式格式定义
+	eventFormat     *FormatInfo  // 事件格式定义
 }

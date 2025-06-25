@@ -126,7 +126,18 @@ var parseDialogueTestCases = []ParseDialogueTestCase{
 	{
 		name: "基础文本",
 		d: ass.DialogueInfo{
-			Dialogue: []string{"{Dialogue", "0", "0:00:00.00", "0:00:05.00", "Default", "", "0", "0", "0", `简单文本`},
+			Fields: map[string]string{
+				"Layer": "0",
+				"Start": "0:00:00.00", 
+				"End": "0:00:05.00",
+				"Style": "Default",
+				"Name": "",
+				"MarginL": "0",
+				"MarginR": "0", 
+				"MarginV": "0",
+				"Effect": "",
+				"Text": "简单文本",
+			},
 		},
 		fd: map[string]ass.FontDesc{
 			"Default": {FontName: "楷体", Bold: 400, Italic: 0},
@@ -143,7 +154,18 @@ var parseDialogueTestCases = []ParseDialogueTestCase{
 	{
 		name: "样式重置到初始",
 		d: ass.DialogueInfo{
-			Dialogue: []string{"{Dialogue", "0", "0:00:00.00", "0:00:05.00", "Default", "", "0", "0", "0", `{\fn宋体\b1}重置前{\r}重置后`},
+			Fields: map[string]string{
+				"Layer": "0",
+				"Start": "0:00:00.00", 
+				"End": "0:00:05.00",
+				"Style": "Default",
+				"Name": "",
+				"MarginL": "0",
+				"MarginR": "0", 
+				"MarginV": "0",
+				"Effect": "",
+				"Text": `{\fn宋体\b1}重置前{\r}重置后`,
+			},
 		},
 		fd: map[string]ass.FontDesc{
 			"Default": {FontName: "楷体", Bold: 400, Italic: 0},
@@ -164,7 +186,18 @@ var parseDialogueTestCases = []ParseDialogueTestCase{
 	{
 		name: "样式重置到指定",
 		d: ass.DialogueInfo{
-			Dialogue: []string{"{Dialogue", "0", "0:00:00.00", "0:00:05.00", "style1", "", "0", "0", "0", `{\rstyle2}指定样式`},
+			Fields: map[string]string{
+				"Layer": "0",
+				"Start": "0:00:00.00", 
+				"End": "0:00:05.00",
+				"Style": "style1",
+				"Name": "",
+				"MarginL": "0",
+				"MarginR": "0", 
+				"MarginV": "0",
+				"Effect": "",
+				"Text": `{\rstyle2}指定样式`,
+			},
 		},
 		fd: map[string]ass.FontDesc{
 			"style1": {FontName: "楷体", Bold: 400, Italic: 0},
@@ -183,7 +216,18 @@ var parseDialogueTestCases = []ParseDialogueTestCase{
 	{
 		name: "转义字符",
 		d: ass.DialogueInfo{
-			Dialogue: []string{"{Dialogue", "0", "0:00:00.00", "0:00:05.00", "Default", "", "0", "0", "0", `转义\{字符\}测试`},
+			Fields: map[string]string{
+				"Layer": "0",
+				"Start": "0:00:00.00", 
+				"End": "0:00:05.00",
+				"Style": "Default",
+				"Name": "",
+				"MarginL": "0",
+				"MarginR": "0", 
+				"MarginV": "0",
+				"Effect": "",
+				"Text": `转义\{字符\}测试`,
+			},
 		},
 		fd: map[string]ass.FontDesc{
 			"Default": {FontName: "楷体", Bold: 400, Italic: 0},
@@ -204,7 +248,18 @@ var parseDialogueTestCases = []ParseDialogueTestCase{
 	{
 		name: "重置后转义",
 		d: ass.DialogueInfo{
-			Dialogue: []string{"{Dialogue", "0", "0:00:00.00", "0:00:05.00", "Default", "", "0", "0", "0", `{\fn宋体}重置前{\r}\{重置后\}`},
+			Fields: map[string]string{
+				"Layer": "0",
+				"Start": "0:00:00.00", 
+				"End": "0:00:05.00",
+				"Style": "Default",
+				"Name": "",
+				"MarginL": "0",
+				"MarginR": "0", 
+				"MarginV": "0",
+				"Effect": "",
+				"Text": `{\fn宋体}重置前{\r}\{重置后\}`,
+			},
 		},
 		fd: map[string]ass.FontDesc{
 			"Default": {FontName: "楷体", Bold: 400, Italic: 0},
@@ -227,7 +282,18 @@ var parseDialogueTestCases = []ParseDialogueTestCase{
 	{
 		name: "混合样式标签",
 		d: ass.DialogueInfo{
-			Dialogue: []string{"{Dialogue", "0", "0:00:00.00", "0:00:05.00", "style1", "", "0", "0", "0", `{\fnA\b1}粗体A{\rstyle2\i1}斜体B{\r}普通`},
+			Fields: map[string]string{
+				"Layer": "0",
+				"Start": "0:00:00.00", 
+				"End": "0:00:05.00",
+				"Style": "style1",
+				"Name": "",
+				"MarginL": "0",
+				"MarginR": "0", 
+				"MarginV": "0",
+				"Effect": "",
+				"Text": `{\fnA\b1}粗体A{\rstyle2\i1}斜体B{\r}普通`,
+			},
 		},
 		fd: map[string]ass.FontDesc{
 			"style1": {FontName: "楷体", Bold: 400, Italic: 0},
@@ -253,7 +319,18 @@ var parseDialogueTestCases = []ParseDialogueTestCase{
 	{
 		name: "特殊字符",
 		d: ass.DialogueInfo{
-			Dialogue: []string{"{Dialogue", "0", "0:00:00.00", "0:00:05.00", "style1", "", "0", "0", "0", `特殊字符: \n \h \{ \} \\`},
+			Fields: map[string]string{
+				"Layer": "0",
+				"Start": "0:00:00.00", 
+				"End": "0:00:05.00",
+				"Style": "style1",
+				"Name": "",
+				"MarginL": "0",
+				"MarginR": "0", 
+				"MarginV": "0",
+				"Effect": "",
+				"Text": `特殊字符: \n \h \{ \} \\`,
+			},
 		},
 		fd: map[string]ass.FontDesc{
 			"style1": {FontName: "楷体", Bold: 400, Italic: 0},
@@ -275,7 +352,18 @@ var parseDialogueTestCases = []ParseDialogueTestCase{
 	{
 		name: "复杂嵌套样式",
 		d: ass.DialogueInfo{
-			Dialogue: []string{"{Dialogue", "0", "0:00:00.00", "0:00:10.00", "style1", "", "0", "0", "0", `开始{\fnA}样式A{\fnB\b1}样式B{\r}重置{\rstyle2}样式2{\r}结束`},
+			Fields: map[string]string{
+				"Layer": "0",
+				"Start": "0:00:00.00", 
+				"End": "0:00:10.00",
+				"Style": "style1",
+				"Name": "",
+				"MarginL": "0",
+				"MarginR": "0", 
+				"MarginV": "0",
+				"Effect": "",
+				"Text": `开始{\fnA}样式A{\fnB\b1}样式B{\r}重置{\rstyle2}样式2{\r}结束`,
+			},
 		},
 		fd: map[string]ass.FontDesc{
 			"style1": {FontName: "楷体", Bold: 400, Italic: 0},
@@ -310,7 +398,18 @@ var parseDialogueTestCases = []ParseDialogueTestCase{
 	{
 		name: "空样式块",
 		d: ass.DialogueInfo{
-			Dialogue: []string{"{Dialogue", "0", "0:00:00.00", "0:00:05.00", "style1", "", "0", "0", "0", `开始{}结束`},
+			Fields: map[string]string{
+				"Layer": "0",
+				"Start": "0:00:00.00", 
+				"End": "0:00:05.00",
+				"Style": "style1",
+				"Name": "",
+				"MarginL": "0",
+				"MarginR": "0", 
+				"MarginV": "0",
+				"Effect": "",
+				"Text": `开始{}结束`,
+			},
 		},
 		fd: map[string]ass.FontDesc{
 			"style1": {FontName: "楷体", Bold: 400, Italic: 0},
@@ -327,7 +426,18 @@ var parseDialogueTestCases = []ParseDialogueTestCase{
 	{
 		name: "多语言字符",
 		d: ass.DialogueInfo{
-			Dialogue: []string{"{Dialogue", "0", "0:00:00.00", "0:00:05.00", "style1", "", "0", "0", "0", `中文Chinese 日本語한국어`},
+			Fields: map[string]string{
+				"Layer": "0",
+				"Start": "0:00:00.00", 
+				"End": "0:00:05.00",
+				"Style": "style1",
+				"Name": "",
+				"MarginL": "0",
+				"MarginR": "0", 
+				"MarginV": "0",
+				"Effect": "",
+				"Text": `中文Chinese 日本語한국어`,
+			},
 		},
 		fd: map[string]ass.FontDesc{
 			"style1": {FontName: "楷体", Bold: 400, Italic: 0},
@@ -355,8 +465,19 @@ var parseDialogueTestCases = []ParseDialogueTestCase{
 	{
 		name: "混合测试",
 		d: ass.DialogueInfo{
-			Content:  nil,
-			Dialogue: []string{"{ Dialogue", "0", "0:00:00.88", "0:59:59.82", "style1", "", "0", "0", "0", `我{你甚至可以在这里写注释\CODE_HERE\前面可以是一段代码，但无需关注}能{这里是\rndx10}吞下{\fn宋体\b1\i1}玻璃而{\pos(400,400)}不{\r}伤身{\rstyle2}体\{这是转义的\n括号\}`},
+			Content: nil,
+			Fields: map[string]string{
+				"Layer": "0",
+				"Start": "0:00:00.88", 
+				"End": "0:59:59.82",
+				"Style": "style1",
+				"Name": "",
+				"MarginL": "0",
+				"MarginR": "0", 
+				"MarginV": "0",
+				"Effect": "",
+				"Text": `我{你甚至可以在这里写注释\CODE_HERE\前面可以是一段代码，但无需关注}能{这里是\rndx10}吞下{\fn宋体\b1\i1}玻璃而{\pos(400,400)}不{\r}伤身{\rstyle2}体\{这是转义的\n括号\}`,
+			},
 		},
 		fd: map[string]ass.FontDesc{
 			"Default": {

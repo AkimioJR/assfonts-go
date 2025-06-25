@@ -16,6 +16,8 @@ type ASSParser struct {
 	HasFonts          bool                      // 是否包含字体样式
 	HasDefaultStyle   bool                      // 是否有默认样式
 	StyleNameFontDesc map[string]FontDesc       // 样式描述
+	StyleFormat       *FormatInfo               // 样式格式定义
+	EventFormat       *FormatInfo               // 事件格式定义
 }
 
 func NewASSParser(reader io.Reader) (*ASSParser, error) {
@@ -82,11 +84,13 @@ func (ap *ASSParser) parseContent(i int, s parseState) (parseState, error) {
 	case startWith(ci.RawContent, "[V4+ Styles]"), startWith(ci.RawContent, "[V4 Styles]"):
 		s.inStyleSection = true
 		s.inEventSection = false
+		s.styleFormat = nil // 重置格式定义
 		return s, nil
 
 	case startWith(ci.RawContent, "[Events]"):
 		s.inEventSection = true
 		s.inStyleSection = false
+		s.eventFormat = nil // 重置格式定义
 		return s, nil
 	case startWith(ci.RawContent, "["):
 		s.inStyleSection = false
@@ -95,15 +99,39 @@ func (ap *ASSParser) parseContent(i int, s parseState) (parseState, error) {
 
 	// 根据当前状态处理行
 	switch {
-	case s.inStyleSection && startWith(ci.RawContent, "Style:"):
-		err := ap.parseStyleLine(i)
+	case s.inStyleSection && startWith(ci.RawContent, "Format:"):
+		// 解析样式格式定义
+		format, err := ParseFormat(ci.RawContent)
 		if err != nil {
-			return s, ErrInvalidStyleFormat
+			return s, err
+		}
+		s.styleFormat = format
+		ap.StyleFormat = format
+
+	case s.inStyleSection && startWith(ci.RawContent, "Style:"):
+		if s.styleFormat == nil {
+			return s, ErrMissingFormat
+		}
+		err := ap.parseStyleLine(i, s.styleFormat)
+		if err != nil {
+			return s, err
 		}
 		s.hasStyle = true
 
-	case s.inEventSection && startWith(ci.RawContent, "Dialogue:"):
-		err := ap.parseEventLine(i)
+	case s.inEventSection && startWith(ci.RawContent, "Format:"):
+		// 解析事件格式定义
+		format, err := ParseFormat(ci.RawContent)
+		if err != nil {
+			return s, err
+		}
+		s.eventFormat = format
+		ap.EventFormat = format
+
+	case s.inEventSection && (startWith(ci.RawContent, "Dialogue:") || startWith(ci.RawContent, "Comment:")):
+		if s.eventFormat == nil {
+			return s, ErrMissingFormat
+		}
+		err := ap.parseEventLine(i, s.eventFormat)
 		if err != nil {
 			return s, err
 		}
@@ -113,15 +141,16 @@ func (ap *ASSParser) parseContent(i int, s parseState) (parseState, error) {
 }
 
 // 解析单行样式
-func (ap *ASSParser) parseStyleLine(i int) error {
-	fields := parseLine(ap.Contents[i].RawContent, 10)
-	if fields == nil {
+func (ap *ASSParser) parseStyleLine(i int, format *FormatInfo) error {
+	fields, err := ParseDataLine(ap.Contents[i].RawContent, format)
+	if err != nil {
 		return ErrInvalidStyleFormat
 	}
 
 	si := StyleInfo{
-		Content: &ap.Contents[i],
-		Style:   fields,
+		Content:    &ap.Contents[i],
+		Fields:     fields,
+		FormatInfo: format,
 	}
 	ap.Styles = append(ap.Styles, si)
 	ap.setStyleNameFontDesc(&si)
@@ -129,14 +158,16 @@ func (ap *ASSParser) parseStyleLine(i int) error {
 }
 
 // 解析单行事件
-func (ap *ASSParser) parseEventLine(i int) error {
-	fields := parseLine(ap.Contents[i].RawContent, 10)
-	if fields == nil {
+func (ap *ASSParser) parseEventLine(i int, format *FormatInfo) error {
+	fields, err := ParseDataLine(ap.Contents[i].RawContent, format)
+	if err != nil {
 		return ErrInvalidEventFormat
 	}
+
 	di := DialogueInfo{
-		Content:  &ap.Contents[i],
-		Dialogue: fields,
+		Content:    &ap.Contents[i],
+		Fields:     fields,
+		FormatInfo: format,
 	}
 	ap.Dialogues = append(ap.Dialogues, di)
 	return ap.ParseDialogue(&di)
@@ -146,31 +177,39 @@ func (ap *ASSParser) setStyleNameFontDesc(style *StyleInfo) {
 	// Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
 	// Style: Default,方正准圆_GBK,48,&H00FFFFFF,&HF0000000,&H00665806,&H0058281B,0,0,0,0,100,100,1,0,1,2,0,2,30,30,10,1
 
-	if len(style.Style) > 1 && style.Style[1] == defaultFontName { // 检查是否为 Default 样式
+	styleName, ok := style.Fields["Name"]
+	if !ok || styleName == "" {
+		styleName = defaultFontName
+	}
+
+	if styleName == defaultFontName { // 检查是否为 Default 样式
 		ap.HasDefaultStyle = true
 	}
 
-	styleName := style.Style[1]                         // 第二个字段是样式名称
-	fontname := strings.TrimPrefix(style.Style[2], "@") // 第三个字段是字体名称，去掉前缀 @（如果有的话）
+	fontname, ok := style.Fields["Fontname"]
+	if !ok {
+		fontname = ""
+	}
+	fontname = strings.TrimPrefix(fontname, "@") // 去掉前缀 @（如果有的话）
+
 	fd := FontDesc{
 		FontName: fontname,
-		Bold:     400, // 默认粗细大小
-		Italic:   0,   // 默认不斜体
+		Bold:     defaultFontSize, // 默认粗细大小
+		Italic:   defaultItalic,   // 默认不斜体
 	}
-	if len(style.Style) > 8 {
-		if bold, err := calculateBold(style.Style[8]); err == nil || err == ErrInvalidBoldValue {
+
+	if boldStr, ok := style.Fields["Bold"]; ok {
+		if bold, err := calculateBold(boldStr); err == nil || err == ErrInvalidBoldValue {
 			fd.Bold = bold // 计算粗体大小
-		} else {
-			fd.Bold = defaultFontSize // 如果计算失败，使用默认值
 		}
 	}
-	if len(style.Style) > 9 {
-		if italic, err := calculateItalic(style.Style[9]); err == nil || err == ErrInvalidItalicValue {
+
+	if italicStr, ok := style.Fields["Italic"]; ok {
+		if italic, err := calculateItalic(italicStr); err == nil || err == ErrInvalidItalicValue {
 			fd.Italic = italic // 是否启用斜体
-		} else {
-			fd.Italic = defaultItalic // 如果计算失败，使用默认值
 		}
 	}
+
 	ap.StyleNameFontDesc[styleName] = fd // 保存样式名称对应的字体描述
 }
 
@@ -186,12 +225,13 @@ func (ap *ASSParser) ParseDialogue(dialogue *DialogueInfo) error {
 		ap.FontSets[initialFD] = make(CodepointSet)
 	}
 
-	if len(dialogue.Dialogue) < 10 {
+	// 获取对话文本内容
+	text, ok := dialogue.Fields["Text"]
+	if !ok || text == "" {
 		return nil // 如果没有对话文本内容就跳过
 	}
 
-	runes := []rune(dialogue.Dialogue[9])
-
+	runes := []rune(text)
 	currentFD := initialFD // 当前对话使用的字体描述
 
 	idx := 0
@@ -220,8 +260,8 @@ func (p *ASSParser) getFontDescStyle(dialogue *DialogueInfo) (FontDesc, error) {
 	// Dialogue: 0,0:00:31.43,0:00:34.45,Default,NTP,0,0,0,,反复读了很多遍之后让我明白了不少事情
 
 	var styleName string = defaultFontName // 默认样式
-	if len(dialogue.Dialogue) > 4 && dialogue.Dialogue[4] != "" {
-		styleName = dialogue.Dialogue[4]
+	if style, ok := dialogue.Fields["Style"]; ok && style != "" {
+		styleName = style
 	}
 
 	fd, ok := p.StyleNameFontDesc[styleName]

@@ -12,24 +12,47 @@ func startWith(raw string, prefix string) bool {
 	return strings.HasPrefix(strings.ToLower(raw), strings.ToLower(prefix))
 }
 
-// 解析类似于 Style: 或 Dialogue: 这样的 ASS 行，将其各个属性分割出来
-// 返回切片的长度不会小于 numField
-func parseLine(line string, numField int) []string {
-	// Style: Default,方正准圆_GBK,48,&H00FFFFFF,&HF0000000,&H00665806,&H0058281B,0,0,0,0,100,100,1,0,1,2,0,2,30,30,10,1
-
-	// 先按冒号分割，再按逗号分割
+// 解析格式定义行（Format:）
+func ParseFormat(line string) (*FormatInfo, error) {
+	// Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
 	parts := strings.SplitN(line, ":", 2)
-	if len(parts) < 2 {
-		return nil
+	if len(parts) != 2 {
+		return nil, ErrInvalidStyleFormat
 	}
-	fields := []string{strings.TrimSpace(parts[0])}
-	for _, f := range strings.SplitN(parts[1], ",", numField-1) {
-		fields = append(fields, strings.TrimSpace(f))
+
+	fieldsStr := strings.TrimSpace(parts[1])
+	fieldNames := strings.Split(fieldsStr, ",")
+
+	// 清理字段名称
+	for i := range fieldNames {
+		fieldNames[i] = strings.TrimSpace(fieldNames[i])
 	}
-	if len(fields) < numField {
-		return nil
+
+	return &FormatInfo{Fields: fieldNames}, nil
+}
+
+// 解析数据行（Style: 或 Dialogue:）并返回字段映射
+func ParseDataLine(line string, format *FormatInfo) (map[string]string, error) {
+	// Style: Default,方正准圆_GBK,48,&H00FFFFFF,&HF0000000,&H00665806,&H0058281B,0,0,0,0,100,100,1,0,1,2,0,2,30,30,10,1
+	// Dialogue: 1,0:56:02.80,0:56:08.34,OP-JP,,0,0,10,,{\an2\c&HFFFFFF&\bord4\blur3\fs50\fax-0.1\3c&HA0350D&}突然降る夕立　あぁ傘もないや嫌
+
+	// 先按冒号分割
+	parts := strings.SplitN(line, ":", 2)
+	if len(parts) != 2 {
+		return nil, ErrInvalidStyleFormat
 	}
-	return fields
+
+	fieldCount := len(format.Fields)
+	values := strings.SplitN(strings.TrimSpace(parts[1]), ",", fieldCount)
+
+	result := make(map[string]string)
+
+	// 将分割的值与对应的字段名进行映射
+	for i := 0; i < fieldCount && i < len(values); i++ {
+		result[format.Fields[i]] = strings.TrimSpace(values[i])
+	}
+
+	return result, nil
 }
 
 func findTag(code []rune, pos int) (string, int) {
