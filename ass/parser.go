@@ -248,9 +248,9 @@ func (ap *ASSParser) gatherCharacter(runes []rune, idx int, currentFD *FontDesc,
 				if _, ok := ap.FontSets[*currentFD]; !ok {
 					ap.FontSets[*currentFD] = make(CodepointSet)
 				}
-				ap.FontSets[*currentFD][runes[idx]] = struct{}{}
+				ap.FontSets[*currentFD][runes[idx+1]] = struct{}{}
 			}
-			return idx + 1 // 跳过 \{ \}
+			return idx + 2 // 跳过 \{ \}
 		}
 	}
 
