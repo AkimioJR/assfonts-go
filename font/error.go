@@ -106,6 +106,44 @@ func (e *ErrMissingFontFaceFound) Error() string {
 	return fmt.Sprintf(`missing font face found for "%s" (%d,%d)`, e.FontName, e.Bold, e.Italic)
 }
 
+type ErrSubsetInputCreate struct {
+	s FontFaceLocation
+}
+
+func NewErrSubsetInputCreate(s *FontFaceLocation) *ErrSubsetInputCreate {
+	return &ErrSubsetInputCreate{s: *s}
+}
+
+func (e *ErrSubsetInputCreate) Error() string {
+	return fmt.Sprintf(`failed to create HarfBuzz subset input for font: "%s"[%d]`, e.s.Path, e.s.Index)
+}
+
+type ErrSubsetFail struct {
+	s              FontFaceLocation
+	codepointCount int
+}
+
+func NewErrSubsetFail(s *FontFaceLocation, codepointCount int) *ErrSubsetFail {
+	return &ErrSubsetFail{s: *s, codepointCount: codepointCount}
+}
+
+func (e *ErrSubsetFail) Error() string {
+	return fmt.Sprintf(`failed to create font subset for font "%s"[%d] with %d codepoints`, e.s.Path, e.s.Index, e.codepointCount)
+}
+
+type ErrSubsetDataGet struct {
+	s          FontFaceLocation
+	dataLength uint
+}
+
+func NewErrSubsetDataGet(s *FontFaceLocation, dataLength uint) *ErrSubsetDataGet {
+	return &ErrSubsetDataGet{s: *s, dataLength: dataLength}
+}
+
+func (e *ErrSubsetDataGet) Error() string {
+	return fmt.Sprintf(`failed to get subset font data for font  "%s"[%d], data length: %d`, e.s.Path, e.s.Index, e.dataLength)
+}
+
 type WarningMsg string
 
 func NewWarningMsg(format string, a ...any) *WarningMsg {
@@ -129,5 +167,8 @@ func (i InfoMsg) Error() string {
 }
 
 var _ error = (*ErrUnSupportEncode)(nil)
+var _ error = (*ErrSubsetInputCreate)(nil)
+var _ error = (*ErrSubsetFail)(nil)
+var _ error = (*ErrSubsetDataGet)(nil)
 var _ error = (*WarningMsg)(nil)
 var _ error = (*InfoMsg)(nil)

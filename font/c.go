@@ -19,7 +19,6 @@ package font
 import "C"
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"github/Akimio521/assfonts-go/ass"
 	"os"
@@ -357,16 +356,17 @@ func (db *FontDataBase) CreatSubfont(subsetFontInfo *SubsetFontInfo, fontData []
 	// 创建 subset input
 	input := C.hb_subset_input_create_or_fail()
 	if input == nil {
-		return nil, errors.New("hb subset input create failed")
+		return nil, NewErrSubsetInputCreate(&subsetFontInfo.Source)
 	}
 	defer C.hb_subset_input_destroy(input)
+
 	inputCodepoints := C.hb_subset_input_set(input, C.HB_SUBSET_SETS_UNICODE)
 	C.hb_set_union(inputCodepoints, cpSet)
 
 	// 子集化
 	subsetFace := C.hb_subset_or_fail(face, input)
 	if subsetFace == nil {
-		return nil, errors.New("hb_subset_or_fail failed")
+		return nil, NewErrSubsetFail(&subsetFontInfo.Source, len(subsetFontInfo.Codepoints))
 	}
 	defer C.hb_face_destroy(subsetFace)
 
@@ -376,10 +376,8 @@ func (db *FontDataBase) CreatSubfont(subsetFontInfo *SubsetFontInfo, fontData []
 	var length C.uint
 	subsetData := C.hb_blob_get_data(subsetBlob, &length)
 	if subsetData == nil || length == 0 {
-		return nil, errors.New("hb_blob_get_data failed")
+		return nil, NewErrSubsetDataGet(&subsetFontInfo.Source, uint(length))
 	}
 
-	// 将C字节数组转换为Go字节切片
-	goData := C.GoBytes(unsafe.Pointer(subsetData), C.int(length))
-	return goData, nil
+	return C.GoBytes(unsafe.Pointer(subsetData), C.int(length)), nil
 }
