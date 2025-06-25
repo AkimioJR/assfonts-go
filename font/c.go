@@ -344,7 +344,7 @@ func (db *FontDataBase) CreatSubfont(subsetFontInfo *SubsetFontInfo, fontData []
 	defer C.hb_blob_destroy(blob)
 
 	// 创建 HarfBuzz face
-	face := C.hb_face_create(blob, 0)
+	face := C.hb_face_create(blob, C.uint(subsetFontInfo.Source.Index))
 	defer C.hb_face_destroy(face)
 
 	// 创建 codepoint set
