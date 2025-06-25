@@ -236,7 +236,7 @@ func (db *FontDataBase) subset(sfi *SubsetFontInfo, c *subsetConfig) (string, []
 	if err != nil {
 		return "", nil, err
 	}
-	return sfi.FontsDesc.FontName + filepath.Ext(sfi.Source.Path), subFontData, nil
+	return sfi.FontsDesc.String() + filepath.Ext(sfi.Source.Path), subFontData, nil
 }
 
 func (db *FontDataBase) parseSubsetFontInfos(ap *ass.ASSParser, fn CheckErrFn) ([]SubsetFontInfo, error) {

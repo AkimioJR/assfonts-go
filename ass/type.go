@@ -1,6 +1,9 @@
 package ass
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 type CodepointSet map[rune]struct{}
 
@@ -32,6 +35,11 @@ type FontDesc struct {
 	FontName string // 字体名称
 	Bold     uint   // 字粗
 	Italic   uint   // 是否启用斜体，0->不启用
+}
+
+// String 返回 FontDesc 的字符串表示，用于排序
+func (fd *FontDesc) String() string {
+	return fmt.Sprintf("%s_%d_%d", fd.FontName, fd.Bold, fd.Italic)
 }
 
 const (

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 	"unicode"
 )
@@ -408,8 +409,18 @@ func (ap *ASSParser) WriteWithEmbeddedFonts(fontDatas map[string][]byte, writer 
 			if _, err = writer.Write([]byte("[Fonts]")); err != nil {
 				goto fail
 			}
-			for fontName, fontData := range fontDatas {
-				if _, err = writer.Write([]byte("\nfontname:" + fontName + "\n")); err != nil {
+
+			// 对字体名称进行排序以确保输出的确定性
+			var fontNames []string
+			for fontName := range fontDatas {
+				fontNames = append(fontNames, fontName)
+			}
+			sort.Strings(fontNames)
+
+			// 按排序后的顺序写入字体
+			for _, fontName := range fontNames {
+				fontData := fontDatas[fontName]
+				if _, err = writer.Write([]byte("\nfontname: " + fontName + "\n")); err != nil {
 					goto fail
 				}
 				if err = UUEncode(fontData, writer, true); err != nil {
