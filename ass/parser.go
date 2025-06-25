@@ -17,14 +17,12 @@ type ASSParser struct {
 	EventFormat       *FormatInfo               // 事件格式定义
 	Dialogues         []DialogueInfo            // ASS 字幕 Dialogues 内容
 	FontSets          map[FontDesc]CodepointSet // 字体集
-	HasFonts          bool                      // 是否包含字体样式
 }
 
 func NewASSParser(reader io.Reader) (*ASSParser, error) {
 	ap := &ASSParser{
 		Contents:          make([]ContentInfo, 0, 200),
 		FontSets:          make(map[FontDesc]CodepointSet),
-		HasFonts:          false,
 		HasDefaultStyle:   false,
 		StyleNameFontDesc: make(map[string]FontDesc),
 	}
@@ -39,7 +37,6 @@ func NewASSParser(reader io.Reader) (*ASSParser, error) {
 
 		switch temp {
 		case "[fonts]":
-			ap.HasFonts = true
 			inFontsSection = true // 设置标志位
 			continue              // 跳过 [Fonts] 行
 		case "[events]", "[script info]", "[v4 styles]", "[v4+ styles]", "[graphics]":
