@@ -325,7 +325,7 @@ func (db *FontDataBase) CheckGlyph(fontData []byte, source *FontFaceLocation, fo
 		if codepoint == 0 {
 			continue
 		}
-		if C.FT_Get_Char_Index(face, C.FT_ULong(codepoint)) != 0 { // 未找到对应的字形
+		if C.FT_Get_Char_Index(face, C.FT_ULong(codepoint)) == 0 { // 未找到对应的字形
 			missingCodepoints = append(missingCodepoints, codepoint)
 		}
 	}
