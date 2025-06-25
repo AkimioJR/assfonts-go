@@ -303,9 +303,6 @@ func (ap *ASSParser) StyleOverride(code []rune, currentFD *FontDesc, initialFD *
 		}
 		tagChar := code[pos] // 获取标签的第一个字符
 		pos++                // 移动到标签内容开始位置
-		if pos >= len(code) {
-			break
-		}
 
 		switch tagChar {
 		case 'f': // 处理字体相关标签 (\fn, \fr, 等)
@@ -344,21 +341,21 @@ func (ap *ASSParser) StyleOverride(code []rune, currentFD *FontDesc, initialFD *
 
 		case 'r': // 处理样式重置标签 (\r)
 			// 检查是否是\rnd标签
-			if pos+1 < len(code) && code[pos] == 'n' && code[pos+1] == 'd' {
+			if pos < len(code) && pos+1 < len(code) && code[pos] == 'n' && code[pos+1] == 'd' {
 				pos += 2 // 跳过 "nd"
 				continue
 			}
 
 			var styleName string
-			styleName, pos = findTag(code, pos)
+			if pos < len(code) {
+				styleName, pos = findTag(code, pos)
+			}
 			styleName = strings.TrimSpace(styleName)
 
 			if styleName == "" { // 无样式名时重置为初始样式
 				currentFDCopy = *initialFD
 			} else if desc, ok := ap.StyleNameFontDesc[styleName]; ok { // 找到指定样式，更新当前字体描述
-				currentFDCopy.FontName = desc.FontName
-				currentFDCopy.Bold = desc.Bold
-				currentFDCopy.Italic = desc.Italic
+				currentFDCopy = desc
 			} else {
 				fmt.Printf("Style \"%s\" not found. (Line %d)\n", styleName, ci.LineNum)
 			}
