@@ -316,7 +316,7 @@ func (db *FontDataBase) CheckGlyph(fontData []byte, source *FontFaceLocation, fo
 
 	errCode := C.FT_New_Memory_Face(db.lib.ptr, (*C.FT_Byte)(cFontData), C.FT_Long(len(fontData)), C.FT_Long(source.Index), &face)
 	if errCode != 0 {
-		return fmt.Errorf("parse font error, error code: %d", int(errCode))
+		return NewErrOpenFontFace(source.Path, source.Index, int(errCode))
 	}
 	defer C.FT_Done_Face(face) // 释放元字体对象
 
