@@ -3,12 +3,13 @@ package font
 import (
 	"encoding/json"
 	"fmt"
-	"github/Akimio521/assfonts-go/ass"
 	"math"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
+
+	"github.com/Akimio521/assfonts-go/ass"
 )
 
 type FontDataBase struct {

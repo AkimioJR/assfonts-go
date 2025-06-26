@@ -2,9 +2,10 @@ package ass_test
 
 import (
 	"fmt"
-	"github/Akimio521/assfonts-go/ass"
 	"strings"
 	"testing"
+
+	"github.com/Akimio521/assfonts-go/ass"
 
 	"github.com/stretchr/testify/require"
 )

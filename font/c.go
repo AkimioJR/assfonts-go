@@ -20,10 +20,11 @@ import "C"
 import (
 	"bytes"
 	"fmt"
-	"github/Akimio521/assfonts-go/ass"
 	"os"
 	"strings"
 	"unsafe"
+
+	"github.com/Akimio521/assfonts-go/ass"
 )
 
 type FreeTypeLibrary struct {

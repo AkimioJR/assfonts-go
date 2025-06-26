@@ -3,7 +3,8 @@ package font
 import (
 	"errors"
 	"fmt"
-	"github/Akimio521/assfonts-go/ass"
+
+	"github.com/Akimio521/assfonts-go/ass"
 )
 
 var (

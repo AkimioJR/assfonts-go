@@ -1,10 +1,11 @@
 package font_test
 
 import (
-	"github/Akimio521/assfonts-go/ass"
-	"github/Akimio521/assfonts-go/font"
 	"os"
 	"testing"
+
+	"github.com/Akimio521/assfonts-go/ass"
+	"github.com/Akimio521/assfonts-go/font"
 )
 
 const (

@@ -1,8 +1,9 @@
 package ass_test
 
 import (
-	"github/Akimio521/assfonts-go/ass"
 	"testing"
+
+	"github.com/Akimio521/assfonts-go/ass"
 )
 
 func TestParseDataLineWithCommas(t *testing.T) {

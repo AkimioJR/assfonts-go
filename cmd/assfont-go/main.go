@@ -3,10 +3,11 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github/Akimio521/assfonts-go/ass"
-	"github/Akimio521/assfonts-go/font"
 	"os"
 	"strings"
+
+	"github.com/Akimio521/assfonts-go/ass"
+	"github.com/Akimio521/assfonts-go/font"
 )
 
 const (
