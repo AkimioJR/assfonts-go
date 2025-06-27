@@ -1,8 +1,8 @@
 package font
 
 /*
-#cgo CFLAGS: -I${SRCDIR}/clib/arm64-osx/include
-#cgo LDFLAGS: -L${SRCDIR}/clib/arm64-osx/lib -lfreetype -lharfbuzz -lharfbuzz-subset -lbz2 -lbrotlidec -lbrotlicommon -lbrotlienc -lz -lpng16
+#cgo CFLAGS: -I${SRCDIR}/include/freetype2 -I${SRCDIR}/include/harfbuzz
+#cgo LDFLAGS: -L${SRCDIR}/libs -lfreetype -lharfbuzz -lharfbuzz-subset -lbz2 -lbrotlidec -lbrotlicommon -lbrotlienc -lz -lpng16
 
 // freetype
 #include <ft2build.h>
@@ -14,7 +14,7 @@ package font
 
 // harfbuzz
 #define HB_EXPERIMENTAL_API
-#include <harfbuzz/hb-subset.h>
+#include <hb-subset.h>
 */
 import "C"
 import (
