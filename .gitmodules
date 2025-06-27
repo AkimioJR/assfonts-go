@@ -1,0 +1,20 @@
+[submodule "third_party/freetype"]
+    path = third_party/freetype
+    url = https://github.com/freetype/freetype.git
+[submodule "third_party/harfbuzz"]
+    path = third_party/harfbuzz
+    url = https://github.com/harfbuzz/harfbuzz.git
+[submodule "third_party/libpng"]
+    path = third_party/libpng
+    url = https://github.com/pnggroup/libpng.git
+	branch = libpng16
+[submodule "third_party/zlib"]
+    path = third_party/zlib
+    url = https://github.com/madler/zlib.git
+    branch = master
+[submodule "third_party/bzip2"]
+    path = third_party/bzip2
+    url = https://sourceware.org/git/bzip2.git
+[submodule "third_party/brotli"]
+    path = third_party/brotli
+    url = https://github.com/google/brotli.git
