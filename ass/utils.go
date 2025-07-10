@@ -16,7 +16,7 @@ func startWith(raw string, prefix string) bool {
 // 不会修改 content 的内容
 func parseStyleLine(content *ContentInfo, format *FormatInfo) (*StyleInfo, error) {
 	// Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-	fields, err := ParseDataLine(&content.RawContent, format)
+	fields, err := ParseDataLine(content.RawContent, format)
 	if err != nil {
 		return nil, ErrInvalidStyleFormat
 	}
@@ -32,7 +32,7 @@ func parseStyleLine(content *ContentInfo, format *FormatInfo) (*StyleInfo, error
 // 解析单行事件
 // // 不会修改 content 的内容
 func parseEventLine(content *ContentInfo, format *FormatInfo) (*DialogueInfo, error) {
-	fields, err := ParseDataLine(&content.RawContent, format)
+	fields, err := ParseDataLine(content.RawContent, format)
 	if err != nil {
 		return nil, ErrInvalidEventFormat
 	}
@@ -53,8 +53,7 @@ func ParseFormat(line string) (*FormatInfo, error) {
 		return nil, ErrInvalidStyleFormat
 	}
 
-	fieldsStr := strings.TrimSpace(parts[1])
-	fieldNames := strings.Split(fieldsStr, ",")
+	fieldNames := strings.Split(strings.TrimSpace(parts[1]), ",")
 
 	// 清理字段名称
 	for i := range fieldNames {
@@ -65,12 +64,12 @@ func ParseFormat(line string) (*FormatInfo, error) {
 }
 
 // 解析数据行（Style: 或 Dialogue:）并返回字段映射
-func ParseDataLine(line *string, format *FormatInfo) (map[string]string, error) {
+func ParseDataLine(line string, format *FormatInfo) (map[string]string, error) {
 	// Style: Default,方正准圆_GBK,48,&H00FFFFFF,&HF0000000,&H00665806,&H0058281B,0,0,0,0,100,100,1,0,1,2,0,2,30,30,10,1
 	// Dialogue: 1,0:56:02.80,0:56:08.34,OP-JP,,0,0,10,,{\an2\c&HFFFFFF&\bord4\blur3\fs50\fax-0.1\3c&HA0350D&}突然降る夕立　あぁ傘もないや嫌
 
 	// 先按冒号分割
-	parts := strings.SplitN(*line, ":", 2)
+	parts := strings.SplitN(line, ":", 2)
 	if len(parts) != 2 {
 		return nil, ErrInvalidStyleFormat
 	}

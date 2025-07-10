@@ -70,7 +70,7 @@ func TestParseDataLineWithCommas(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			result, err := ass.ParseDataLine(&tc.line, format)
+			result, err := ass.ParseDataLine(tc.line, format)
 			require.NoErrorf(t, err, "parseDataLine 失败: %v", err)
 
 			// 检查每个字段
