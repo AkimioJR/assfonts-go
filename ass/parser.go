@@ -10,19 +10,19 @@ import (
 )
 
 type ASSParser struct {
-	Contents          []ContentInfo             // 元素内容（不包含关于Font）
-	StyleFormat       *FormatInfo               // 样式格式定义
-	Styles            []StyleInfo               // 包含哪些样式
+	Contents          []ContentInfo             // 元素内容
+	StyleTable        StyleTable                // 样式表
+	EventTable        EventTable                // 事件表
 	StyleNameFontDesc map[string]FontDesc       // 样式描述
 	HasDefaultStyle   bool                      // 是否有默认样式
-	EventFormat       *FormatInfo               // 事件格式定义
-	Dialogues         []DialogueInfo            // ASS 字幕 Dialogues 内容
 	FontSets          map[FontDesc]CodepointSet // 字体集
 }
 
 func NewASSParser(reader io.Reader) (*ASSParser, error) {
 	ap := &ASSParser{
 		Contents:          make([]ContentInfo, 0, 200),
+		StyleTable:        StyleTable{Rows: make([]StyleInfo, 0)},
+		EventTable:        EventTable{Rows: make([]DialogueInfo, 0)},
 		FontSets:          make(map[FontDesc]CodepointSet),
 		HasDefaultStyle:   false,
 		StyleNameFontDesc: make(map[string]FontDesc),
@@ -82,13 +82,13 @@ func (ap *ASSParser) parseContent(i int, s parseState) (parseState, error) {
 	case startWith(ci.RawContent, "[V4+ Styles]"), startWith(ci.RawContent, "[V4 Styles]"):
 		s.inStyleSection = true
 		s.inEventSection = false
-		ap.StyleFormat = nil // 重置格式定义
+		ap.StyleTable.Format = nil // 重置格式定义
 		return s, nil
 
 	case startWith(ci.RawContent, "[Events]"):
 		s.inEventSection = true
 		s.inStyleSection = false
-		ap.EventFormat = nil // 重置格式定义
+		ap.EventTable.Format = nil // 重置格式定义
 		return s, nil
 	case startWith(ci.RawContent, "["):
 		s.inStyleSection = false
@@ -103,13 +103,13 @@ func (ap *ASSParser) parseContent(i int, s parseState) (parseState, error) {
 		if err != nil {
 			return s, err
 		}
-		ap.StyleFormat = format
+		ap.StyleTable.Format = format
 
 	case s.inStyleSection && startWith(ci.RawContent, "Style:"):
-		if ap.StyleFormat == nil {
+		if ap.StyleTable.Format == nil {
 			return s, ErrMissingFormat
 		}
-		err := ap.parseStyleLine(i, ap.StyleFormat)
+		err := ap.parseStyleLine(i, ap.StyleTable.Format)
 		if err != nil {
 			return s, err
 		}
@@ -121,13 +121,13 @@ func (ap *ASSParser) parseContent(i int, s parseState) (parseState, error) {
 		if err != nil {
 			return s, err
 		}
-		ap.EventFormat = format
+		ap.EventTable.Format = format
 
 	case s.inEventSection && (startWith(ci.RawContent, "Dialogue:") || startWith(ci.RawContent, "Comment:")):
-		if ap.EventFormat == nil {
+		if ap.EventTable.Format == nil {
 			return s, ErrMissingFormat
 		}
-		err := ap.parseEventLine(i, ap.EventFormat)
+		err := ap.parseEventLine(i, ap.EventTable.Format)
 		if err != nil {
 			return s, err
 		}
@@ -148,7 +148,7 @@ func (ap *ASSParser) parseStyleLine(i int, format *FormatInfo) error {
 		Fields:     fields,
 		FormatInfo: format,
 	}
-	ap.Styles = append(ap.Styles, si)
+	ap.StyleTable.Rows = append(ap.StyleTable.Rows, si)
 	ap.setStyleNameFontDesc(&si)
 	return nil
 }
@@ -165,7 +165,7 @@ func (ap *ASSParser) parseEventLine(i int, format *FormatInfo) error {
 		Fields:     fields,
 		FormatInfo: format,
 	}
-	ap.Dialogues = append(ap.Dialogues, di)
+	ap.EventTable.Rows = append(ap.EventTable.Rows, di)
 	return ap.ParseDialogue(&di)
 }
 

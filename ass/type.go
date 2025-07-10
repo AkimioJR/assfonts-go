@@ -12,19 +12,16 @@ type ContentInfo struct {
 	RawContent string // 文本内容
 }
 
-// 新增：格式定义结构体
 type FormatInfo struct {
 	Fields []string // 字段名称列表
 }
 
-// 重新设计：样式信息结构体
 type StyleInfo struct {
 	Content    *ContentInfo      // 原始内容
 	Fields     map[string]string // 字段名->值的映射
 	FormatInfo *FormatInfo       // 格式定义
 }
 
-// 重新设计：对话信息结构体
 type DialogueInfo struct {
 	Content    *ContentInfo      // 原始内容
 	Fields     map[string]string // 字段名->值的映射
@@ -60,10 +57,41 @@ var (
 	ErrMissingFormat      = errors.New("missing format line")   // 缺少格式定义行
 )
 
-// 新增：解析状态结构体
 type parseState struct {
 	inStyleSection bool // 是否在 [V4 Styles] 模块中
 	inEventSection bool // 是否在 [Events] 模块中
 	hasStyle       bool // 是否已找到 [V4 Styles] 模块
 	hasEvent       bool // 是否已找到 [Events] 模块
+}
+
+// 样式表结构体（类似SQL表）
+type StyleTable struct {
+	Format *FormatInfo // 表头格式定义
+	Rows   []StyleInfo // 数据行
+}
+
+// 根据样式名称获取样式信息
+func (st *StyleTable) GetStyleByName(name string) (*StyleInfo, bool) {
+	for i := range st.Rows {
+		if styleName, ok := st.Rows[i].Fields["Name"]; ok && styleName == name {
+			return &st.Rows[i], true
+		}
+	}
+	return nil, false
+}
+
+type EventTable struct {
+	Format *FormatInfo    // 表头格式定义
+	Rows   []DialogueInfo // 数据行
+}
+
+// 根据样式名称获取对话信息
+func (et *EventTable) GetDialoguesByStyle(styleName string) []DialogueInfo {
+	var dialogues []DialogueInfo
+	for _, dialogue := range et.Rows {
+		if style, ok := dialogue.Fields["Style"]; ok && style == styleName {
+			dialogues = append(dialogues, dialogue)
+		}
+	}
+	return dialogues
 }
