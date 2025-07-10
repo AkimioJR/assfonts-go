@@ -138,6 +138,7 @@ func (ap *ASSParser) parseContent(i int, s parseState) (parseState, error) {
 
 // 解析单行样式
 func (ap *ASSParser) parseStyleLine(i int, format *FormatInfo) error {
+	// Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 	fields, err := ParseDataLine(ap.Contents[i].RawContent, format)
 	if err != nil {
 		return ErrInvalidStyleFormat
@@ -440,4 +441,20 @@ func (ap *ASSParser) WriteWithEmbeddedFonts(fontDatas map[string][]byte, writer 
 
 fail:
 	return fmt.Errorf("embed ass error when write to writer: %w", err)
+}
+
+// 将 ASS 内容转换为 SRT 格式并写入指定的 Writer
+func (ap *ASSParser) ToSRT(writer io.Writer) error {
+	for i, di := range ap.EventTable.Rows {
+		_, err := fmt.Fprintf(writer,
+			"%d\n%s --> %s\n%s\n\n",
+			i+1,
+			strings.TrimSpace(di.Fields["Start"]),
+			strings.TrimSpace(di.Fields["End"]),
+			CleanEffects(di.Fields["Text"]))
+		if err != nil {
+			return fmt.Errorf("failed to write SRT content at ASS line %d: %w", di.Content.LineNum, err)
+		}
+	}
+	return nil
 }

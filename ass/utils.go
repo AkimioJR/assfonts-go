@@ -147,3 +147,70 @@ func UUEncode(data []byte, writer io.Writer, insertLinebreaks bool) error {
 fail:
 	return fmt.Errorf("write error when UUencoding: %w", err)
 }
+
+// 清除ASS字幕中的特效标记，返回纯文本
+func CleanEffects(text string) string {
+	if text == "" {
+		return ""
+	}
+
+	runes := []rune(text)
+	result := make([]rune, 0, len(runes))
+
+	i := 0
+	for i < len(runes) {
+		// 处理转义字符
+		if i < len(runes)-1 && runes[i] == '\\' {
+			switch runes[i+1] {
+			case 'h': // 硬空格，转换为普通空格
+				result = append(result, ' ')
+				i += 2
+			case 'n', 'N': // 换行符，转换为换行
+				result = append(result, '\n')
+				i += 2
+			case '{', '}': // 转义的花括号，保留
+				result = append(result, runes[i+1])
+				i += 2
+			default:
+				// 其他转义字符直接跳过
+				i += 2
+			}
+			continue
+		}
+
+		// 处理特效标记 {...}
+		if runes[i] == '{' {
+			// 使用嵌套计数处理花括号
+			endIdx := i + 1
+			depth := 1
+			for endIdx < len(runes) && depth > 0 {
+				switch runes[endIdx] {
+				case '{':
+					depth++
+				case '}':
+					depth--
+				}
+				endIdx++
+			}
+			if depth == 0 { // 找到了匹配的花括号，跳过整个特效块
+				i = endIdx
+			} else { // 没有找到匹配的花括号，跳过到第一个可能的实际文本
+				j := i + 1
+				for j < len(runes) { // 查找第一个中文字符或字母作为实际文本的开始
+					if runes[j] >= 0x4e00 && runes[j] <= 0x9fff { // 中文字符
+						break
+					}
+					j++
+				}
+				i = j
+			}
+			continue
+		}
+
+		// 普通字符，直接添加
+		result = append(result, runes[i])
+		i++
+	}
+
+	return strings.TrimSpace(string(result))
+}

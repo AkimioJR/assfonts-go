@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/Akimio521/assfonts-go/ass"
+	"github.com/stretchr/testify/require"
 )
 
 func TestParseDataLineWithCommas(t *testing.T) {
@@ -92,6 +93,73 @@ func TestParseDataLineWithCommas(t *testing.T) {
 			if text, exists := result["Text"]; exists {
 				t.Logf("Text 字段解析结果: '%s'", text)
 			}
+		})
+	}
+}
+
+func TestCleanEffects(t *testing.T) {
+
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "简单特效标记",
+			input:    "{\\fade(500,500)}本字幕由动漫国字幕组制作",
+			expected: "本字幕由动漫国字幕组制作",
+		},
+		{
+			name:     "多重特效标记",
+			input:    "{\\fad(500,0)\\fnB3CJROEU\\fs22\\frz19.65\\c&H6C6D6F&\\pos(468,349)}测试文本",
+			expected: "测试文本",
+		},
+		{
+			name:     "换行符处理",
+			input:    "第一行\\N第二行\\n第三行",
+			expected: "第一行\n第二行\n第三行",
+		},
+		{
+			name:     "硬空格处理",
+			input:    "文本\\h空格\\h处理",
+			expected: "文本 空格 处理",
+		},
+		{
+			name:     "转义花括号",
+			input:    "普通文本\\{保留的花括号\\}",
+			expected: "普通文本{保留的花括号}",
+		},
+		{
+			name:     "混合内容",
+			input:    "{\\fade(500,500)}本字幕由动漫国字幕组制作(dmguo.org)\\N仅供试看,请支持购买正版音像制品",
+			expected: "本字幕由动漫国字幕组制作(dmguo.org)\n仅供试看,请支持购买正版音像制品",
+		},
+		{
+			name:     "嵌套花括号",
+			input:    "{\\fade(500,500){\\fn字体}}测试文本",
+			expected: "测试文本",
+		},
+		{
+			name:     "空文本",
+			input:    "",
+			expected: "",
+		},
+		{
+			name:     "纯文本",
+			input:    "没有特效的纯文本",
+			expected: "没有特效的纯文本",
+		},
+		{
+			name:     "不匹配的花括号",
+			input:    "{\\fade(500,500没有结束的特效标记",
+			expected: "没有结束的特效标记",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := ass.CleanEffects(tt.input)
+			require.Equal(t, tt.expected, result)
 		})
 	}
 }
