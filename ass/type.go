@@ -17,15 +17,16 @@ type FormatInfo struct {
 }
 
 type StyleInfo struct {
-	Content    *ContentInfo      // 原始内容
+	content    *ContentInfo      // 原始内容
+	formatInfo *FormatInfo       // 格式定义
 	Fields     map[string]string // 字段名->值的映射
-	FormatInfo *FormatInfo       // 格式定义
+
 }
 
 type DialogueInfo struct {
-	Content    *ContentInfo      // 原始内容
+	content    *ContentInfo      // 原始内容
+	formatInfo *FormatInfo       // 格式定义
 	Fields     map[string]string // 字段名->值的映射
-	FormatInfo *FormatInfo       // 格式定义
 }
 
 type FontDesc struct {

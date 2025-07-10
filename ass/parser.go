@@ -145,9 +145,9 @@ func (ap *ASSParser) parseStyleLine(i int, format *FormatInfo) error {
 	}
 
 	si := StyleInfo{
-		Content:    &ap.Contents[i],
+		content:    &ap.Contents[i],
 		Fields:     fields,
-		FormatInfo: format,
+		formatInfo: format,
 	}
 	ap.StyleTable.Rows = append(ap.StyleTable.Rows, si)
 	ap.setStyleNameFontDesc(&si)
@@ -162,9 +162,9 @@ func (ap *ASSParser) parseEventLine(i int, format *FormatInfo) error {
 	}
 
 	di := DialogueInfo{
-		Content:    &ap.Contents[i],
+		content:    &ap.Contents[i],
 		Fields:     fields,
-		FormatInfo: format,
+		formatInfo: format,
 	}
 	ap.EventTable.Rows = append(ap.EventTable.Rows, di)
 	return ap.ParseDialogue(&di)
@@ -214,7 +214,7 @@ func (ap *ASSParser) setStyleNameFontDesc(style *StyleInfo) {
 func (ap *ASSParser) ParseDialogue(dialogue *DialogueInfo) error {
 	initialFD, err := ap.getFontDescStyle(dialogue)
 	if err != nil {
-		return fmt.Errorf("failed to get font description style for dialogue at line %d: %w", dialogue.Content.LineNum, err)
+		return fmt.Errorf("failed to get font description style for dialogue at line %d: %w", dialogue.content.LineNum, err)
 	}
 
 	// 初始化字体集合
@@ -233,7 +233,7 @@ func (ap *ASSParser) ParseDialogue(dialogue *DialogueInfo) error {
 
 	idx := 0
 	for idx < len(runes) {
-		idx = ap.gatherCharacter(runes, idx, &currentFD, &initialFD, dialogue.Content)
+		idx = ap.gatherCharacter(runes, idx, &currentFD, &initialFD, dialogue.content)
 	}
 	return nil
 }
@@ -453,7 +453,7 @@ func (ap *ASSParser) ToSRT(writer io.Writer) error {
 			strings.TrimSpace(di.Fields["End"]),
 			CleanEffects(di.Fields["Text"]))
 		if err != nil {
-			return fmt.Errorf("failed to write SRT content at ASS line %d: %w", di.Content.LineNum, err)
+			return fmt.Errorf("failed to write SRT content at ASS line %d: %w", di.content.LineNum, err)
 		}
 	}
 	return nil

@@ -468,7 +468,6 @@ var parseDialogueTestCases = []ParseDialogueTestCase{
 	{
 		name: "混合测试",
 		d: ass.DialogueInfo{
-			Content: nil,
 			Fields: map[string]string{
 				"Layer":   "0",
 				"Start":   "0:00:00.88",
