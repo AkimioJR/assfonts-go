@@ -9,12 +9,13 @@ type StyleTable struct {
 	styleNameFontDesc map[string]FontDesc // 样式名->字体信息
 }
 
-func NewStyleTable(styleNameFontDesc map[string]FontDesc) StyleTable {
-	return StyleTable{
+func NewStyleTable(styleNameFontDesc map[string]FontDesc) *StyleTable {
+	s := StyleTable{
 		Format:            nil,
 		rows:              make([]StyleInfo, 0),
 		styleNameFontDesc: styleNameFontDesc,
 	}
+	return &s
 }
 
 // Append 添加样式到样式表

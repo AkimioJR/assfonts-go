@@ -11,8 +11,8 @@ import (
 
 type ASSParser struct {
 	Contents   []ContentInfo             // 元素内容
-	StyleTable StyleTable                // 样式表
-	EventTable EventTable                // 事件表
+	StyleTable *StyleTable               // 样式表
+	EventTable *EventTable               // 事件表
 	FontSets   map[FontDesc]CodepointSet // 字体集
 }
 
@@ -20,7 +20,7 @@ func NewASSParser(reader io.Reader) (*ASSParser, error) {
 	ap := &ASSParser{
 		Contents:   make([]ContentInfo, 0, 200),
 		StyleTable: NewStyleTable(make(map[string]FontDesc)),
-		EventTable: EventTable{Rows: make([]DialogueInfo, 0)},
+		EventTable: &EventTable{Rows: make([]DialogueInfo, 0)},
 		FontSets:   make(map[FontDesc]CodepointSet),
 	}
 
