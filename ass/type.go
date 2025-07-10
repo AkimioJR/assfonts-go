@@ -20,7 +20,6 @@ type StyleInfo struct {
 	content    *ContentInfo      // 原始内容
 	formatInfo *FormatInfo       // 格式定义
 	Fields     map[string]string // 字段名->值的映射
-
 }
 
 type DialogueInfo struct {
@@ -40,6 +39,35 @@ func (fd *FontDesc) String() string {
 	return fmt.Sprintf("%s_%d_%d", fd.FontName, fd.Bold, fd.Italic)
 }
 
+type parseState struct {
+	inStyleSection bool // 是否在 [V4 Styles] 模块中
+	inEventSection bool // 是否在 [Events] 模块中
+	hasStyle       bool // 是否已找到 [V4 Styles] 模块
+	hasEvent       bool // 是否已找到 [Events] 模块
+}
+
+// 样式表结构体
+type StyleTable struct {
+	Format *FormatInfo // 表头格式定义
+	Rows   []StyleInfo // 数据行
+}
+
+// 根据样式名称获取样式信息
+func (st *StyleTable) GetStyleByName(name string) (*StyleInfo, bool) {
+	for i := range st.Rows {
+		if styleName, ok := st.Rows[i].Fields["Name"]; ok && styleName == name {
+			return &st.Rows[i], true
+		}
+	}
+	return nil, false
+}
+
+// 对话事件表结构体
+type EventTable struct {
+	Format *FormatInfo    // 表头格式定义
+	Rows   []DialogueInfo // 数据行
+}
+
 const (
 	defaultFontName     = "Default" // 默认字体名称
 	defaultFontSize     = 400       // 默认字体大小
@@ -57,42 +85,3 @@ var (
 	ErrInvalidItalicValue = errors.New("invalid italic value")  // 不合法斜体值
 	ErrMissingFormat      = errors.New("missing format line")   // 缺少格式定义行
 )
-
-type parseState struct {
-	inStyleSection bool // 是否在 [V4 Styles] 模块中
-	inEventSection bool // 是否在 [Events] 模块中
-	hasStyle       bool // 是否已找到 [V4 Styles] 模块
-	hasEvent       bool // 是否已找到 [Events] 模块
-}
-
-// 样式表结构体（类似SQL表）
-type StyleTable struct {
-	Format *FormatInfo // 表头格式定义
-	Rows   []StyleInfo // 数据行
-}
-
-// 根据样式名称获取样式信息
-func (st *StyleTable) GetStyleByName(name string) (*StyleInfo, bool) {
-	for i := range st.Rows {
-		if styleName, ok := st.Rows[i].Fields["Name"]; ok && styleName == name {
-			return &st.Rows[i], true
-		}
-	}
-	return nil, false
-}
-
-type EventTable struct {
-	Format *FormatInfo    // 表头格式定义
-	Rows   []DialogueInfo // 数据行
-}
-
-// 根据样式名称获取对话信息
-func (et *EventTable) GetDialoguesByStyle(styleName string) []DialogueInfo {
-	var dialogues []DialogueInfo
-	for _, dialogue := range et.Rows {
-		if style, ok := dialogue.Fields["Style"]; ok && style == styleName {
-			dialogues = append(dialogues, dialogue)
-		}
-	}
-	return dialogues
-}
