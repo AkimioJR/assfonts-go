@@ -366,12 +366,14 @@ fail:
 // 将 ASS 内容转换为 SRT 格式并写入指定的 Writer
 func (ap *ASSParser) ToSRT(writer io.Writer) error {
 	for i, di := range ap.EventTable.Rows {
-		_, err := fmt.Fprintf(writer,
+		_, err := fmt.Fprintf(
+			writer,
 			"%d\n%s --> %s\n%s\n\n",
 			i+1,
-			strings.TrimSpace(di.Fields["Start"]),
-			strings.TrimSpace(di.Fields["End"]),
-			CleanEffects(di.Fields["Text"]))
+			di.Fields["Start"],
+			di.Fields["End"],
+			CleanEffects(di.Fields["Text"]),
+		)
 		if err != nil {
 			return fmt.Errorf("failed to write SRT content at ASS line %d: %w", di.content.LineNum, err)
 		}
