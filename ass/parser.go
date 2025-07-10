@@ -109,10 +109,12 @@ func (ap *ASSParser) parseContent(i int, s parseState) (parseState, error) {
 		if ap.StyleTable.Format == nil {
 			return s, ErrMissingFormat
 		}
-		err := ap.parseStyleLine(i, ap.StyleTable.Format)
+		si, err := parseStyleLine(&ap.Contents[i], ap.StyleTable.Format)
 		if err != nil {
 			return s, err
 		}
+		ap.StyleTable.Rows = append(ap.StyleTable.Rows, *si)
+		ap.setStyleNameFontDesc(si)
 		s.hasStyle = true
 
 	case s.inEventSection && startWith(ci.RawContent, "Format:"):
@@ -127,47 +129,14 @@ func (ap *ASSParser) parseContent(i int, s parseState) (parseState, error) {
 		if ap.EventTable.Format == nil {
 			return s, ErrMissingFormat
 		}
-		err := ap.parseEventLine(i, ap.EventTable.Format)
+		di, err := parseEventLine(&ap.Contents[i], ap.EventTable.Format)
 		if err != nil {
 			return s, err
 		}
+		ap.EventTable.Rows = append(ap.EventTable.Rows, *di)
 		s.hasEvent = true
 	}
 	return s, nil
-}
-
-// 解析单行样式
-func (ap *ASSParser) parseStyleLine(i int, format *FormatInfo) error {
-	// Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-	fields, err := ParseDataLine(ap.Contents[i].RawContent, format)
-	if err != nil {
-		return ErrInvalidStyleFormat
-	}
-
-	si := StyleInfo{
-		content:    &ap.Contents[i],
-		Fields:     fields,
-		formatInfo: format,
-	}
-	ap.StyleTable.Rows = append(ap.StyleTable.Rows, si)
-	ap.setStyleNameFontDesc(&si)
-	return nil
-}
-
-// 解析单行事件
-func (ap *ASSParser) parseEventLine(i int, format *FormatInfo) error {
-	fields, err := ParseDataLine(ap.Contents[i].RawContent, format)
-	if err != nil {
-		return ErrInvalidEventFormat
-	}
-
-	di := DialogueInfo{
-		content:    &ap.Contents[i],
-		Fields:     fields,
-		formatInfo: format,
-	}
-	ap.EventTable.Rows = append(ap.EventTable.Rows, di)
-	return ap.ParseDialogue(&di)
 }
 
 func (ap *ASSParser) setStyleNameFontDesc(style *StyleInfo) {
