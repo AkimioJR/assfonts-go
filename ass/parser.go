@@ -20,7 +20,7 @@ func NewASSParser(reader io.Reader) (*ASSParser, error) {
 	ap := &ASSParser{
 		Contents:   make([]ContentInfo, 0, 200),
 		StyleTable: NewStyleTable(make(map[string]FontDesc)),
-		EventTable: &EventTable{Rows: make([]DialogueInfo, 0)},
+		EventTable: &EventTable{rows: make([]*DialogueInfo, 0)},
 		FontSets:   make(map[FontDesc]CodepointSet),
 	}
 
@@ -109,7 +109,7 @@ func (ap *ASSParser) parseContent(i int, s parseState) (parseState, error) {
 		if err != nil {
 			return s, err
 		}
-		ap.StyleTable.Append(*si)
+		ap.StyleTable.Append(si)
 		s.hasStyle = true
 
 	case s.inEventSection && startWith(ci.RawContent, "Format:"):
@@ -128,7 +128,7 @@ func (ap *ASSParser) parseContent(i int, s parseState) (parseState, error) {
 		if err != nil {
 			return s, err
 		}
-		ap.EventTable.Rows = append(ap.EventTable.Rows, *di)
+		ap.EventTable.rows = append(ap.EventTable.rows, di)
 		s.hasEvent = true
 	}
 	return s, nil
@@ -219,7 +219,6 @@ func (ap *ASSParser) gatherCharacter(runes []rune, idx int, currentFD *FontDesc,
 			endIdx++
 		}
 		if endIdx >= len(runes) { // 没有找到 '}'，直接加入当前字符
-
 			if currentFD.FontName != "" {
 				if _, ok := ap.FontSets[*currentFD]; !ok {
 					ap.FontSets[*currentFD] = make(CodepointSet)
@@ -277,6 +276,7 @@ func (ap *ASSParser) StyleOverride(code []rune, currentFD *FontDesc, initialFD *
 					currentFDCopy.FontName = fontName
 				}
 			}
+
 		case 'b': // 处理粗体标签 (\b)
 			if pos < len(code) && (unicode.IsDigit(rune(code[pos])) || code[pos] == '-' || code[pos] == ' ') {
 				var boldStr string
@@ -286,6 +286,7 @@ func (ap *ASSParser) StyleOverride(code []rune, currentFD *FontDesc, initialFD *
 					currentFDCopy.Bold = bold
 				}
 			}
+
 		case 'i': // 处理斜体标签 (\i)
 			if pos < len(code) && (unicode.IsDigit(rune(code[pos])) || code[pos] == '-' || code[pos] == ' ') {
 				var italicStr string
@@ -365,7 +366,7 @@ fail:
 
 // 将 ASS 内容转换为 SRT 格式并写入指定的 Writer
 func (ap *ASSParser) ToSRT(writer io.Writer) error {
-	for i, di := range ap.EventTable.Rows {
+	for i, di := range ap.EventTable.rows {
 		_, err := fmt.Fprintf(
 			writer,
 			"%d\n%s --> %s\n%s\n\n",

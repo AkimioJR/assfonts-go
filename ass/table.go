@@ -5,21 +5,21 @@ import "strings"
 // 样式表结构体
 type StyleTable struct {
 	Format            *FormatInfo         // 表头格式定义
-	rows              []StyleInfo         // 数据行
+	rows              []*StyleInfo        // 数据行
 	styleNameFontDesc map[string]FontDesc // 样式名->字体信息
 }
 
 func NewStyleTable(styleNameFontDesc map[string]FontDesc) *StyleTable {
 	s := StyleTable{
 		Format:            nil,
-		rows:              make([]StyleInfo, 0),
+		rows:              make([]*StyleInfo, 0),
 		styleNameFontDesc: styleNameFontDesc,
 	}
 	return &s
 }
 
 // Append 添加样式到样式表
-func (st *StyleTable) Append(style StyleInfo) {
+func (st *StyleTable) Append(style *StyleInfo) {
 	// Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
 	// Style: Default,方正准圆_GBK,48,&H00FFFFFF,&HF0000000,&H00665806,&H0058281B,0,0,0,0,100,100,1,0,1,2,0,2,30,30,10,1
 
@@ -68,6 +68,6 @@ func (st *StyleTable) GetFontDescByName(name string) *FontDesc {
 
 // 对话事件表结构体
 type EventTable struct {
-	Format *FormatInfo    // 表头格式定义
-	Rows   []DialogueInfo // 数据行
+	Format *FormatInfo     // 表头格式定义
+	rows   []*DialogueInfo // 数据行
 }
