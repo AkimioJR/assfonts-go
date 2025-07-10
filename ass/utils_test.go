@@ -71,24 +71,13 @@ func TestParseDataLineWithCommas(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			result, err := ass.ParseDataLine(tc.line, format)
-			if err != nil {
-				t.Fatalf("parseDataLine 失败: %v", err)
-			}
-
-			// 检查字段数量
-			if len(result) != len(tc.expected) {
-				t.Errorf("字段数量不匹配: 期望 %d, 实际 %d", len(tc.expected), len(result))
-			}
+			require.NoErrorf(t, err, "parseDataLine 失败: %v", err)
 
 			// 检查每个字段
 			for field, expectedValue := range tc.expected {
-				if actualValue, exists := result[field]; !exists {
-					t.Errorf("字段 %s 不存在", field)
-				} else if actualValue != expectedValue {
-					t.Errorf("字段 %s 值不匹配: 期望 '%s', 实际 '%s'", field, expectedValue, actualValue)
-				}
+				require.Contains(t, result, field, "字段 %s 不存在", field)
+				require.Equal(t, expectedValue, result[field], "字段 %s 值不匹配: 期望 '%s', 实际 '%s'", field, expectedValue, result[field])
 			}
-
 			// 特别检查 Text 字段
 			if text, exists := result["Text"]; exists {
 				t.Logf("Text 字段解析结果: '%s'", text)
