@@ -10,22 +10,18 @@ import (
 )
 
 type ASSParser struct {
-	Contents          []ContentInfo             // 元素内容
-	StyleTable        StyleTable                // 样式表
-	EventTable        EventTable                // 事件表
-	StyleNameFontDesc map[string]FontDesc       // 样式描述
-	HasDefaultStyle   bool                      // 是否有默认样式
-	FontSets          map[FontDesc]CodepointSet // 字体集
+	Contents   []ContentInfo             // 元素内容
+	StyleTable StyleTable                // 样式表
+	EventTable EventTable                // 事件表
+	FontSets   map[FontDesc]CodepointSet // 字体集
 }
 
 func NewASSParser(reader io.Reader) (*ASSParser, error) {
 	ap := &ASSParser{
-		Contents:          make([]ContentInfo, 0, 200),
-		StyleTable:        StyleTable{Rows: make([]StyleInfo, 0)},
-		EventTable:        EventTable{Rows: make([]DialogueInfo, 0)},
-		FontSets:          make(map[FontDesc]CodepointSet),
-		HasDefaultStyle:   false,
-		StyleNameFontDesc: make(map[string]FontDesc),
+		Contents:   make([]ContentInfo, 0, 200),
+		StyleTable: NewStyleTable(make(map[string]FontDesc)),
+		EventTable: EventTable{Rows: make([]DialogueInfo, 0)},
+		FontSets:   make(map[FontDesc]CodepointSet),
 	}
 
 	var lineNum uint = 0
@@ -113,8 +109,7 @@ func (ap *ASSParser) parseContent(i int, s parseState) (parseState, error) {
 		if err != nil {
 			return s, err
 		}
-		ap.StyleTable.Rows = append(ap.StyleTable.Rows, *si)
-		ap.setStyleNameFontDesc(si)
+		ap.StyleTable.Append(*si)
 		s.hasStyle = true
 
 	case s.inEventSection && startWith(ci.RawContent, "Format:"):
@@ -137,46 +132,6 @@ func (ap *ASSParser) parseContent(i int, s parseState) (parseState, error) {
 		s.hasEvent = true
 	}
 	return s, nil
-}
-
-func (ap *ASSParser) setStyleNameFontDesc(style *StyleInfo) {
-	// Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-	// Style: Default,方正准圆_GBK,48,&H00FFFFFF,&HF0000000,&H00665806,&H0058281B,0,0,0,0,100,100,1,0,1,2,0,2,30,30,10,1
-
-	styleName, ok := style.Fields["Name"]
-	if !ok || styleName == "" {
-		styleName = defaultFontName
-	}
-
-	if styleName == defaultFontName { // 检查是否为 Default 样式
-		ap.HasDefaultStyle = true
-	}
-
-	fontname, ok := style.Fields["Fontname"]
-	if !ok {
-		fontname = ""
-	}
-	fontname = strings.TrimPrefix(fontname, "@") // 去掉前缀 @（如果有的话）
-
-	fd := FontDesc{
-		FontName: fontname,
-		Bold:     defaultFontSize, // 默认粗细大小
-		Italic:   defaultItalic,   // 默认不斜体
-	}
-
-	if boldStr, ok := style.Fields["Bold"]; ok {
-		if bold, err := calculateBold(boldStr); err == nil || err == ErrInvalidBoldValue {
-			fd.Bold = bold // 计算粗体大小
-		}
-	}
-
-	if italicStr, ok := style.Fields["Italic"]; ok {
-		if italic, err := calculateItalic(italicStr); err == nil || err == ErrInvalidItalicValue {
-			fd.Italic = italic // 是否启用斜体
-		}
-	}
-
-	ap.StyleNameFontDesc[styleName] = fd // 保存样式名称对应的字体描述
 }
 
 // 统计每种字体样式实际用到的字符集合
@@ -222,7 +177,7 @@ func (ap *ASSParser) cleanFontSets() {
 
 // 获取对话对应的字体样式
 // 不会对传入的 DialogueInfo 进行修改
-func (p *ASSParser) getFontDescStyle(dialogue *DialogueInfo) (FontDesc, error) {
+func (ap *ASSParser) getFontDescStyle(dialogue *DialogueInfo) (FontDesc, error) {
 	// Dialogue: 0,0:00:31.43,0:00:34.45,Default,NTP,0,0,0,,反复读了很多遍之后让我明白了不少事情
 
 	var styleName string = defaultFontName // 默认样式
@@ -230,15 +185,11 @@ func (p *ASSParser) getFontDescStyle(dialogue *DialogueInfo) (FontDesc, error) {
 		styleName = style
 	}
 
-	fd, ok := p.StyleNameFontDesc[styleName]
-	if !ok {
-		if p.HasDefaultStyle {
-			return p.StyleNameFontDesc[defaultFontName], nil // 如果没有找到指定样式，返回默认样式
-		} else {
-			return FontDesc{}, fmt.Errorf("style '%s' not found", styleName)
-		}
+	fd := ap.StyleTable.GetFontDescByName(styleName)
+	if fd == nil {
+		return FontDesc{}, fmt.Errorf("style '%s' not found", styleName)
 	}
-	return fd, nil
+	return *fd, nil
 }
 
 // 处理对话文本中的每个字符，收集字体用到的字符
@@ -360,8 +311,8 @@ func (ap *ASSParser) StyleOverride(code []rune, currentFD *FontDesc, initialFD *
 
 			if styleName == "" { // 无样式名时重置为初始样式
 				currentFDCopy = *initialFD
-			} else if desc, ok := ap.StyleNameFontDesc[styleName]; ok { // 找到指定样式，更新当前字体描述
-				currentFDCopy = desc
+			} else if desc := ap.StyleTable.GetFontDescByName(styleName); desc != nil { // 找到指定样式，更新当前字体描述
+				currentFDCopy = *desc
 			} else {
 				fmt.Printf("Style \"%s\" not found. (Line %d)\n", styleName, ci.LineNum)
 			}

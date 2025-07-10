@@ -548,13 +548,13 @@ func TestStyleOverride(t *testing.T) {
 			c.name,
 			func(t *testing.T) {
 				ap := ass.ASSParser{
-					StyleNameFontDesc: map[string]ass.FontDesc{
+					StyleTable: ass.NewStyleTable(map[string]ass.FontDesc{
 						"SongTi": {
 							FontName: "宋体",
 							Bold:     700,
 							Italic:   50,
 						},
-					},
+					}),
 				}
 				currentFD := c.origin
 				ap.StyleOverride([]rune(c.code), &currentFD, &c.origin, nil)
@@ -571,8 +571,8 @@ func TestParseDialogue(t *testing.T) {
 			c.name,
 			func(t *testing.T) {
 				ap := ass.ASSParser{
-					FontSets:          make(map[ass.FontDesc]ass.CodepointSet),
-					StyleNameFontDesc: c.fd,
+					FontSets:   make(map[ass.FontDesc]ass.CodepointSet),
+					StyleTable: ass.NewStyleTable(c.fd),
 				}
 				err := ap.ParseDialogue(&c.d)
 				require.NoError(t, err)
