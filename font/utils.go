@@ -69,15 +69,6 @@ func iconvConvert(in []byte, fromCode, toCode string) (string, error) {
 	return writer.String(), nil
 }
 
-func contains[T comparable](list []T, s T) bool {
-	for _, v := range list {
-		if v == s {
-			return true
-		}
-	}
-	return false
-}
-
 var fontPattern = regexp.MustCompile(`(?i).+\.(ttf|otf|ttc|otc)$`)
 
 // 查找字体文件

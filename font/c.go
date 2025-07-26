@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 	"unsafe"
 
@@ -240,15 +241,15 @@ func parseSfntName(ftFace C.FT_Face, nameIdx C.uint, fn *FontName) error {
 
 	switch name.name_id { // 根据名称ID处理不同的名称
 	case C.TT_NAME_ID_FONT_FAMILY: // 字体家族名称
-		if !contains(fn.FamilyNames, buf) {
+		if !slices.Contains(fn.FamilyNames, buf) {
 			fn.FamilyNames = append(fn.FamilyNames, buf)
 		}
 	case C.TT_NAME_ID_FULL_NAME: // 字体全名
-		if !contains(fn.FullNames, buf) {
+		if !slices.Contains(fn.FullNames, buf) {
 			fn.FullNames = append(fn.FullNames, buf)
 		}
 	case C.TT_NAME_ID_PS_NAME: // PostScript字体名称
-		if !contains(fn.PSNames, buf) {
+		if !slices.Contains(fn.PSNames, buf) {
 			fn.PSNames = append(fn.PSNames, buf)
 		}
 	}

@@ -6,6 +6,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 
@@ -282,17 +283,17 @@ func (db *FontDataBase) FindFont(fontDesc *ass.FontDesc, fontSet ass.CodepointSe
 		var best = &FontFaceLocation{}
 
 		for path, fontFaceInfos := range db.data {
-			if !contains(acceptExts, strings.ToLower(filepath.Ext(path))) {
+			if !slices.Contains(acceptExts, strings.ToLower(filepath.Ext(path))) {
 				continue
 			}
 			for _, fontFaceInfo := range fontFaceInfos {
 				var currentErr int = math.MaxInt // 当前误差
 				found := false
 
-				if contains(fontFaceInfo.Name.FullNames, targetName) || contains(fontFaceInfo.Name.PSNames, targetName) { // 精确匹配，全名一致
+				if slices.Contains(fontFaceInfo.Name.FullNames, targetName) || slices.Contains(fontFaceInfo.Name.PSNames, targetName) { // 精确匹配，全名一致
 					found = true
 					currentErr = 0
-				} else if contains(fontFaceInfo.Name.FamilyNames, targetName) { // 检查家族名
+				} else if slices.Contains(fontFaceInfo.Name.FamilyNames, targetName) { // 检查家族名
 					currentErr = abs(int(fontDesc.Bold)-int(fontFaceInfo.Weight)) + abs(int(fontDesc.Italic)-int(fontFaceInfo.Slant))
 					found = true
 				}
