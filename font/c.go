@@ -24,7 +24,7 @@ import (
 	"strings"
 	"unsafe"
 
-	"github.com/Akimio521/assfonts-go/ass"
+	"github.com/AkimioJR/assfonts-go/ass"
 )
 
 type FreeTypeLibrary struct {

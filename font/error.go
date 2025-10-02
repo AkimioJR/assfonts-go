@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/Akimio521/assfonts-go/ass"
+	"github.com/AkimioJR/assfonts-go/ass"
 )
 
 var (

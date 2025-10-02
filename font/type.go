@@ -3,7 +3,7 @@ package font
 import (
 	"time"
 
-	"github.com/Akimio521/assfonts-go/ass"
+	"github.com/AkimioJR/assfonts-go/ass"
 )
 
 // 这是标准 ASCII 可打印字符区间，包括空格（0x20）、数字、英文字母、常用标点符号等，一直到波浪号 ~（0x7e）

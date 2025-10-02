@@ -10,7 +10,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/Akimio521/assfonts-go/ass"
+	"github.com/AkimioJR/assfonts-go/ass"
 )
 
 type FontDataBase struct {

@@ -1,4 +1,4 @@
-module github.com/Akimio521/assfonts-go
+module github.com/AkimioJR/assfonts-go
 
 go 1.24.1
 

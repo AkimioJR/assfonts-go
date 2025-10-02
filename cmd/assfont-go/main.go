@@ -6,8 +6,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/Akimio521/assfonts-go/ass"
-	"github.com/Akimio521/assfonts-go/font"
+	"github.com/AkimioJR/assfonts-go/ass"
+	"github.com/AkimioJR/assfonts-go/font"
 )
 
 const (
